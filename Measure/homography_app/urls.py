@@ -7,6 +7,6 @@ urlpatterns = [
     path('mark_distance/', views.mark_distance, name='mark_distance'),
     path('mark_distance_image/', views.mark_distance_image, name='mark_distance_image'),
     path('upload_video/', views.upload_video, name='upload_video'),
-
+    path('list_videos/', views.list_videos),
 ]
 

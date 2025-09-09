@@ -13,6 +13,8 @@ import base64
 from .helper import merge_close_points, save_homography_as_json, detect_and_measure_image
 from django.conf import settings
 
+from .models import PetVideos
+
 DEFAULT_HSV = np.array([26, 116, 152], dtype=np.uint8)
 TOL_H, TOL_S, TOL_V = 10, 50, 50
 
@@ -20,11 +22,32 @@ TOL_H, TOL_S, TOL_V = 10, 50, 50
 @csrf_exempt
 def upload_video(request):
     if request.method == 'POST' and request.FILES.get('video'):
-        video_file = request.FILES['video']
-        file_path = default_storage.save(f'videos/{video_file.name}', ContentFile(video_file.read()))
-        return JsonResponse({'message': 'Video uploaded', 'file_path': file_path})
-    return JsonResponse({'error': 'No video uploaded'}, status=400)
+        video = request.FILES['video']
 
+        # Get extra fields from POST
+        participant_name = request.POST.get('participant_name', 'NoName')
+        pet_type = request.POST.get('pet_type', 'BT')
+        obj = PetVideos.objects.create(
+            name=video.name,
+            file=video,
+            participant_name=participant_name,
+            pet_type=pet_type
+        )
+        return JsonResponse({
+            'status': 'success',
+            'name': obj.name,
+            'participant_name': obj.participant_name,
+            'pet_type': obj.pet_type
+        })
+
+    return JsonResponse({'status': 'error'}, status=400)
+
+
+def list_videos(request):
+    videos = PetVideos.objects.all().order_by('-uploaded_at')
+    data = [{'name': v.name, 'file': v.file.url, 'distance': v.distance, 'participant_name': v.participant_name, "pet_type": v.pet_type} for v
+            in videos]
+    return JsonResponse({'videos': data})
 
 
 def mark_distance_image(request):
@@ -68,6 +91,7 @@ def mark_distance_image(request):
     }
     return render(request, 'mark_distance_image.html', context)
 
+
 def mark_distance(request):
     global clicked_points
     context = {}
@@ -89,7 +113,6 @@ def mark_distance(request):
         # Convert to numpy array
         H = np.array(homography_list, dtype=np.float32)
 
-
         p1 = np.array([[[x1, y1]]], dtype=np.float32)
         p2 = np.array([[[x2, y2]]], dtype=np.float32)
 
@@ -100,6 +123,7 @@ def mark_distance(request):
         context['distance'] = round(dist_cm, 2)
 
     return render(request, 'mark_distance.html', context)
+
 
 def upload_image(request):
     result = None
@@ -112,9 +136,9 @@ def upload_image(request):
 
         # HSV mask
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        h,s,v = DEFAULT_HSV
-        lower = np.array([max(h-TOL_H,0), max(s-TOL_S,0), max(v-TOL_V,0)])
-        upper = np.array([min(h+TOL_H,179), min(s+TOL_S,255), min(v+TOL_V,255)])
+        h, s, v = DEFAULT_HSV
+        lower = np.array([max(h - TOL_H, 0), max(s - TOL_S, 0), max(v - TOL_V, 0)])
+        upper = np.array([min(h + TOL_H, 179), min(s + TOL_S, 255), min(v + TOL_V, 255)])
         mask = cv2.inRange(hsv_frame, lower, upper)
 
         # Contours and centroids
@@ -122,9 +146,9 @@ def upload_image(request):
         points = []
         for cnt in contours:
             M = cv2.moments(cnt)
-            if M["m00"]>0:
-                cx = M["m10"]/M["m00"]
-                cy = M["m01"]/M["m00"]
+            if M["m00"] > 0:
+                cx = M["m10"] / M["m00"]
+                cy = M["m01"] / M["m00"]
                 points.append((cx, cy))
 
         points = merge_close_points(points)
@@ -150,17 +174,16 @@ def upload_image(request):
                     order_points[0] = pt
             order_points += np.array([total_x, total_y])
 
-
-
-            world_pts = np.array([[0,0],[60,0],[60,60],[0,60]], dtype=np.float32)
+            world_pts = np.array([[0, 0], [60, 0], [60, 60], [0, 60]], dtype=np.float32)
             H, _ = cv2.findHomography(order_points, world_pts)
 
             result = f"Homography matrix:\n{H}"
             save_homography_as_json(H)
             # Draw points on image
             for idx, (x, y) in enumerate(order_points):
-                cv2.circle(frame, (int(x), int(y)), 6, (0,0,255), -1)
-                cv2.putText(frame, str(idx+1), (int(x)+5,int(y)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0),1)
+                cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), -1)
+                cv2.putText(frame, str(idx + 1), (int(x) + 5, int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0),
+                            1)
 
             # Convert image to base64 to show in HTML
             _, buffer = cv2.imencode('.jpg', frame)
@@ -168,6 +191,7 @@ def upload_image(request):
             detected_image = f"data:image/jpeg;base64,{detected_image}"
 
     return render(request, 'upload.html', {'result': result, 'detected_image': detected_image})
+
 
 def measure_distance_view(request):
     result_image_path = None
