@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mark Distance on Image</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .container {
+            position: relative;
+            display: inline-block;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* clicks go to image */
+        }
+        #imageDisplay {
+            cursor: crosshair;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload Image</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="image_file" accept="image/*" required><br><br>
+        <input type="submit" value="Upload Image">
+    </form>
+
+    {% if uploaded_image_url %}
+        <h2>Click Two Points to Measure Distance</h2>
+        <div class="container">
+            <img id="imageDisplay" src="{{ uploaded_image_url }}">
+            <canvas id="overlayCanvas"></canvas>
+        </div>
+        <p id="distanceResult"></p>
+    {% endif %}
+
+<script>
+let selectedPoints = [];
+const img = document.getElementById('imageDisplay');
+const canvas = document.getElementById('overlayCanvas');
+const ctx = canvas.getContext('2d');
+
+img.onload = function() {
+    // Match canvas size to the actual image size
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+};
+
+$('#imageDisplay').on('click', function(e) {
+    const rect = img.getBoundingClientRect();
+
+    // Map click to natural image coordinates
+    const scaleX = img.naturalWidth / img.width;
+    const scaleY = img.naturalHeight / img.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+    if (selectedPoints.length >= 2) {
+        selectedPoints = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    selectedPoints.push({x: x, y: y});
+
+    // Draw red circle for point
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Draw line if two points
+    if (selectedPoints.length === 2) {
+        ctx.strokeStyle = 'lime';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(selectedPoints[0].x, selectedPoints[0].y);
+        ctx.lineTo(selectedPoints[1].x, selectedPoints[1].y);
+        ctx.stroke();
+
+        // Send points to server for distance calculation
+        $.post("", {
+            x1: selectedPoints[0].x,
+            y1: selectedPoints[0].y,
+            x2: selectedPoints[1].x,
+            y2: selectedPoints[1].y,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.status) {
+                $('#distanceResult').text(`Distance: ${data.distance} cm`);
+            } else {
+                alert('Error computing distance.');
+            }
+        });
+    }
+});
+</script>
+
+</body>
+</html>

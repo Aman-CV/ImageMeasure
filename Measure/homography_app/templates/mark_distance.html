@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Distance Result</title>
+</head>
+<body>
+    {% if distance %}
+        <h1>Measured Distance: {{ distance }} cm</h1>
+    {% else %}
+        <h1>Mark two points to calculate distance</h1>
+    {% endif %}
+    <a href="{% url 'upload_video' %}">Back</a>
+</body>
+</html>

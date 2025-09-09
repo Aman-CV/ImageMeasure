@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Image for Homography</title>
+</head>
+<body>
+    <h1>Upload Image</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="image" required><br><br>
+        <input type="submit" value="Upload">
+    </form>
+
+    <br><br>
+    <!-- Button to navigate to Measure Distance page -->
+    <form action="{% url 'measure_distance' %}" method="get">
+        <button type="submit">Go to Distance Measurement</button>
+    </form>
+    <br><br>
+      <form action="{% url 'mark_distance_image' %}" method="get">
+        <button type="submit">interactive</button>
+    </form>
+
+    {% if result %}
+        <h2>Result</h2>
+        <pre>{{ result }}</pre>
+        {% if detected_image %}
+            <h3>Detected Points</h3>
+            <img src="{{ detected_image }}" width="500">
+        {% endif %}
+    {% endif %}
+</body>
+</html>
