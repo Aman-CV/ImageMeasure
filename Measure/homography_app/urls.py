@@ -2,11 +2,10 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.upload_image, name='upload_image'),  # Home page for image upload
-    path('measure-distance/', views.measure_distance_view, name='measure_distance'),  # Measure distance page
-    path('mark_distance/', views.mark_distance, name='mark_distance'),
-    path('mark_distance_image/', views.mark_distance_image, name='mark_distance_image'),
-    path('upload_video/', views.upload_video, name='upload_video'),
-    path('list_videos/', views.list_videos),
+    path('upload_video/', views.upload_video, name='upload_video'), #upload video from app
+    path('list_videos/', views.list_videos), # get all videos
+    path('calibrate/',views.upload_calibration_video), #calibrate video and generate homo matrix
+    path('calibration_info/', views.get_homograph), #get calib info
+    #path('get_processed_video/', blah blah), #get processed video
 ]
 
