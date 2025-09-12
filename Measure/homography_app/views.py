@@ -1,5 +1,7 @@
 import json
-from django.http import JsonResponse
+import os
+
+from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 import cv2
@@ -7,7 +9,7 @@ import numpy as np
 from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .task import process_video_task
-from django.core.exceptions import ObjectDoesNotExist
+from django.conf import settings
 
 
 @csrf_exempt
@@ -59,7 +61,7 @@ def upload_calibration_video(request):
                 cy = M["m01"] / M["m00"]
                 points.append((cx, cy))
 
-        points = merge_close_points(points)  # Your custom logic
+        points = merge_close_points(points, threshold=40)  # Your custom logic
 
         if len(points) != 4:
             return JsonResponse({
@@ -142,9 +144,17 @@ def upload_calibration_video(request):
 def list_videos(request):
     videos = PetVideos.objects.all().order_by('-uploaded_at')
     data = [{'name': v.name, 'file': v.file.url, 'distance': v.distance,
-             'participant_name': v.participant_name, "pet_type": v.pet_type, 'id': v.id} for v
+             'participant_name': v.participant_name, "pet_type": v.pet_type, 'id': v.id, 'is_processed': v.is_video_processed} for v
             in videos]
     return JsonResponse({'videos': data})
+
+
+def video_stream(request, filename):
+    file_path = os.path.join(settings.MEDIA_ROOT, 'post_processed_video', filename)
+    if not os.path.exists(file_path):
+        return JsonResponse({"status": "error", "message": "Video not found"}, status=404)
+
+    return FileResponse(open(file_path, 'rb'), content_type='video/mp4')
 
 
 def get_video_detail(request):
@@ -157,13 +167,16 @@ def get_video_detail(request):
         if not video.processed_file:
             return JsonResponse({'status': 'error', 'message': 'Processed video not available'}, status=404)
 
-        video_url = request.build_absolute_uri(video.processed_file.url)
+        filename = os.path.basename(video.processed_file.name)
+        video_url = request.build_absolute_uri(f'/stream_video/{filename}/')
+
         return JsonResponse({
             'status': 'success',
             'processed_video_url': video_url
         })
     except PetVideos.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Video not found'}, status=404)
+
 
 
 

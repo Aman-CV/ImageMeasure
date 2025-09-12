@@ -1,18 +1,26 @@
 # models.py
-from django.db import models
+
 from django.db.models import CheckConstraint, Q
+import os
+import subprocess
+from django.db import models
+from django.conf import settings
+from django.core.files import File
 
 class PetVideos(models.Model):
     name = models.CharField(max_length=255)
+    is_video_processed = models.BooleanField(default=False)
     participant_name = models.CharField(max_length=255, default="NoName")
     file = models.FileField(upload_to='videos/')
     distance = models.FloatField(default=0)
-    pet_type = models.CharField(max_length=32,  default="STANDING_JUMP")
+    pet_type = models.CharField(max_length=32, default="STANDING_JUMP")
     processed_file = models.FileField(upload_to='post_processed_video/', blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
+
+
 
 
 class SingletonHomographicMatrixModel(models.Model):
