@@ -10,7 +10,7 @@ from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .task import process_video_task
 from django.conf import settings
-
+import base64
 
 @csrf_exempt
 def upload_video(request):
@@ -47,7 +47,14 @@ def upload_calibration_video(request):
 
         # HSV mask logic (assume DEFAULT_HSV, TOL_H, TOL_S, TOL_V are defined)
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        h, s, v = DEFAULT_HSV
+        singleton = SingletonHomographicMatrixModel.load()
+        # Load HSV from model if set, else use DEFAULT_HSV
+        if singleton.hsv_value:  # will be {} if not set
+            h = singleton.hsv_value.get('h', DEFAULT_HSV[0])
+            s = singleton.hsv_value.get('s', DEFAULT_HSV[1])
+            v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
+        else:
+            h, s, v = DEFAULT_HSV
         lower = np.array([max(h - TOL_H, 0), max(s - TOL_S, 0), max(v - TOL_V, 0)])
         upper = np.array([min(h + TOL_H, 179), min(s + TOL_S, 255), min(v + TOL_V, 255)])
         mask = cv2.inRange(hsv_frame, lower, upper)
@@ -141,6 +148,48 @@ def upload_calibration_video(request):
     }, status=400)
 
 
+@csrf_exempt
+def process_image(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    try:
+        img_file = request.FILES['image']
+        x = int(request.POST['x'])
+        y = int(request.POST['y'])
+
+        file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        if img is None:
+            return JsonResponse({'error': 'Invalid image'}, status=400)
+        hsv_frame = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        h, s, v = hsv_frame[y, x]
+        h, s, v = int(h), int(s), int(v)
+        lower = np.array([max(h - TOL_H, 0), max(s - TOL_S, 0), max(v - TOL_V, 0)])
+        upper = np.array([min(h + TOL_H, 179), min(s + TOL_S, 255), min(v + TOL_V, 255)])
+        mask = cv2.inRange(hsv_frame, lower, upper)
+        highlight = cv2.convertScaleAbs(img, alpha=1.8, beta=40)
+        output_img = img.copy()
+        output_img[mask > 0] = highlight[mask > 0]
+
+        _, buffer = cv2.imencode('.jpg', output_img)
+        encoded_image = base64.b64encode(buffer).decode('utf-8')
+
+        # ✅ Save HSV value in singleton model
+        singleton = SingletonHomographicMatrixModel.load()
+        singleton.hsv_value = {'h': int(h), 's': int(s), 'v': int(v)}
+        singleton.save()
+
+        return JsonResponse({
+            'hsv': {'h': int(h), 's': int(s), 'v': int(v)},
+            'image_base64': f"data:image/jpeg;base64,{encoded_image}"
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+
 def list_videos(request):
     videos = PetVideos.objects.all().order_by('-uploaded_at')
     data = [{'name': v.name, 'file': v.file.url, 'distance': v.distance,
@@ -176,8 +225,6 @@ def get_video_detail(request):
         })
     except PetVideos.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Video not found'}, status=404)
-
-
 
 
 def get_homograph(request):
