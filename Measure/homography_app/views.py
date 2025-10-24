@@ -127,22 +127,7 @@ def upload_calibration_video(request):
                 [unit_distance, unit_distance],
                 [0, unit_distance]
             ], dtype=np.float32)
-        # Proceed to compute homography and save
-        # pts = np.array(points, dtype=np.float32)
-        # total_x = sum([pt[0] for pt in pts]) / 4.
-        # total_y = sum([pt[1] for pt in pts]) / 4.
-        # pts = pts - np.array([total_x, total_y])
-        # order_points = np.zeros((4, 2))
-        # for pt in pts:
-        #     if pt[0] <= 0 and pt[1] <= 0:
-        #         order_points[3] = pt
-        #     elif pt[0] > 0 > pt[1]:
-        #         order_points[2] = pt
-        #     elif pt[0] > 0 and pt[1] > 0:
-        #         order_points[1] = pt
-        #     else:
-        #         order_points[0] = pt
-        # order_points += np.array([total_x, total_y])
+
         order_points = np.array(order_points_anticlockwise(points))
 
         H, _ = cv2.findHomography(order_points, world_pts)

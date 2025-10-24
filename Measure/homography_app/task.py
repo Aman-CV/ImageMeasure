@@ -7,8 +7,8 @@ import cv2
 import json
 import numpy as np
 from .models import PetVideos, SingletonHomographicMatrixModel
-from .helper import filter_and_smooth, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, equalize_image, detect_biggest_jump, \
-    distance_from_homography, get_flat_start, detect_sine_cycle_in_window, detect_yellow_mask_lab, \
+from .helper import filter_and_smooth, detect_biggest_jump, \
+    distance_from_homography, get_flat_start, \
     ankle_crop_color_detection
 import glob
 from scipy.signal import savgol_filter

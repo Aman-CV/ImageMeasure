@@ -5,25 +5,10 @@ DEFAULT_HSV = np.array([172, 180, 180], dtype=np.uint8)
 TOL_H, TOL_S, TOL_V = 20, 50, 50
 
 from scipy import interpolate, signal
-import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter, find_peaks
 
 import math
 
-# # 7 basic colors (BGR)
-# basic_bgr = np.uint8([
-#     [0,   0, 255],   # red
-#     [0,  69, 255],   # orange
-#     [0, 255, 255],   # yellow
-#     [0, 255,   0],   # green
-#     [255, 0,   0],   # blue
-#     [130, 0,  75],   # indigo
-#     [238, 130, 238]  # violet
-# ])
-# basic_hsv = cv2.cvtColor(basic_bgr.reshape(1, -1, 3), cv2.COLOR_BGR2HSV).reshape(-1, 3)
-#
-# YELLOW_IDX = 0
-# GREEN_IDX = 3
 
 
 def clamp_box(x1, y1, x2, y2, w, h):
@@ -185,86 +170,7 @@ def detect_yellow_mask_lab(frame, clahe=None):
     return full_mask
 
 
-# def detect_bright_yellow_mask(frame_bgr, margin=20, bright_thresh=150):
-#     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
-#     H, S, V = cv2.split(hsv)
-#     h_flat = H.reshape(-1).astype(np.int16)
-#     s_flat = S.reshape(-1).astype(np.int16)
-#     v_flat = V.reshape(-1)
-#
-#     hsv_pixels = np.stack([h_flat, s_flat], axis=1)
-#     basic_hsv_as = basic_hsv[:, :2].astype(np.int16)
-#     dists = np.sum((hsv_pixels[:, None, :] - basic_hsv_as[None, :, :]) ** 2, axis=2)
-#
-#     nearest_idx = np.argmin(dists, axis=1)
-#     mask_yellow = (nearest_idx == YELLOW_IDX)
-#
-#     dist_yellow = dists[:, YELLOW_IDX]
-#     dist_green = dists[:, GREEN_IDX]
-#     mask_yellow = mask_yellow & ((dist_green - dist_yellow) > margin)
-#     mask_yellow = mask_yellow & (v_flat > bright_thresh)
-#
-#     mask_yellow = mask_yellow.reshape(H.shape).astype(np.uint8) * 255
-#     mask_yellow = cv2.medianBlur(mask_yellow, 5)
-#     mask_yellow = cv2.morphologyEx(mask_yellow, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
-#     mask_yellow = cv2.morphologyEx(mask_yellow, cv2.MORPH_CLOSE, np.ones((5,5), np.uint8))
-#
-#     return mask_yellow, nearest_idx.reshape(H.shape)
 
-def simplify_to_primary_colors(frame):
-
-    # Increase contrast slightly
-    frame = cv2.convertScaleAbs(frame, alpha=1.5, beta=0)
-
-    # Define target colors (BGR)
-    palette = np.array([
-        [255,   0,   0],   # Blue
-        [0,     0, 255],   # Red
-        [0,   255,   0],   # Green
-        [0,   255, 255],   # Yellow
-        [255, 255, 255],   # White
-        [0,     0,   0],   # Black
-    ], dtype=np.uint8)
-
-    # Reshape frame to (num_pixels, 3)
-    pixels = frame.reshape((-1, 3)).astype(np.float32)
-
-    # Compute distance to each palette color
-    distances = np.linalg.norm(pixels[:, None, :] - palette[None, :, :], axis=2)
-
-    # Find nearest palette color index
-    nearest_idx = np.argmin(distances, axis=1)
-
-    # Map each pixel to nearest palette color
-    simplified = palette[nearest_idx].reshape(frame.shape).astype(np.uint8)
-
-    return simplified
-
-
-def detect_sine_cycle_in_window(x, smooth=True, window_len=11, min_prominence=0.2):
-
-    x = np.asarray(x)
-    n = len(x)
-
-    # Smooth lightly
-    if smooth:
-        win = min(window_len, n - (n + 1) % 2)
-        x = savgol_filter(x, win, polyorder=3)
-
-    # Detect significant peaks
-    peaks, _ = find_peaks(x, prominence=min_prominence)
-    troughs, _ = find_peaks(-x, prominence=min_prominence)
-
-    # Combine and sort
-    events = np.sort(np.concatenate([peaks, troughs]))
-
-    # Look for full cycle: peak-trough-peak or trough-peak-trough
-    for i in range(len(events) - 2):
-        a, b, c = events[i:i + 3]
-        if (a in peaks and b in troughs and c in peaks) or (a in troughs and b in peaks and c in troughs):
-            return a, c  # start, end of one cycle
-
-    return None
 
 def merge_close_regions(regions, max_gap=2):
     if not regions:
@@ -347,111 +253,13 @@ def detect_biggest_jump(y, smooth_window=11, smooth_poly=2, start_thresh=-1.5, e
 
     while end > start and dy[end - 1] == 0:
         end -= 1
-    # n_base = max(1, len(y_smooth) // 10)
-    # baseline = np.median(y_smooth[-n_base:])
-    #
-    # jump_start_idx = np.where(dy < start_thresh)[0]
-    # jump_end_idx = np.where((dy > end_thresh) & (y_smooth > baseline))[0]
-    #
-    # start, end = None, None
-    # max_jump_height = 0
-    #
-    # for s in jump_start_idx:
-    #     e_candidates = jump_end_idx[jump_end_idx > s]
-    #     if len(e_candidates) == 0:
-    #         continue
-    #     for e in e_candidates:
-    #         jump_height = np.max(y_smooth[s:e + 1]) - np.min(y_smooth[s:e + 1])
-    #         if jump_height > max_jump_height:
-    #             max_jump_height = jump_height
-    #             start, end = s, e
 
     return start - 3, end + 3
 
 
-def detect_jump_parabola(frames, pixel_y, filename="jump_parabola.png"):
-    y_smooth = savgol_filter(pixel_y, window_length=9, polyorder=2)
-
-    apex_idx = np.argmin(y_smooth)
-
-    start_idx, end_idx = apex_idx, apex_idx
-    while start_idx > 0 and y_smooth[start_idx] <= y_smooth[start_idx - 1]:
-        start_idx -= 1
-    while end_idx < len(y_smooth) - 1 and y_smooth[end_idx] <= y_smooth[end_idx + 1]:
-        end_idx += 1
-
-    jump_frames = frames[start_idx:end_idx + 1]
-    jump_y = pixel_y[start_idx:end_idx + 1]
-
-    coeffs = np.polyfit(jump_frames, jump_y, 2)
-    poly = np.poly1d(coeffs)
-
-    fit_x = np.linspace(jump_frames[0], jump_frames[-1], 300)
-    fit_y = poly(fit_x)
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(frames, pixel_y, 'bo-', label='Original Y')
-    plt.plot(frames, y_smooth, 'g--', label='Smoothed Y')
-    plt.plot(jump_frames, jump_y, 'ro', label='Detected Jump Region')
-    plt.plot(fit_x, fit_y, 'k-', label='Fitted Parabola')
-    plt.xlabel('Frame')
-    plt.ylabel('Pixel Y')
-    plt.title('Jump Detection and Parabola Fit')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(filename)
-    plt.close()
-
-    # Optional: Return info about the jump
-    return {
-        'start_frame': jump_frames[0],
-        'end_frame': jump_frames[-1],
-        'apex_frame': frames[apex_idx],
-        'coefficients': coeffs
-    }
-
-def save_frame_vs_pixel_graph(pixel_y, filename="frame_vs_pixel_y.png"):
-    plt.figure(figsize=(10, 6))
-    frames = [i for i in range(len(pixel_y))]
-    plt.plot(frames, pixel_y, label='Pixel Y Position', color='b')
-    plt.xlabel('Frame Number')
-    plt.ylabel('Pixel Y Position')
-    plt.title('Frame vs Pixel Y Position')
-    plt.grid(True)
-    plt.legend()
-
-    # Save the graph to a file
-    plt.savefig(filename)
-    plt.close()  # Close the plot to avoid display
-
 
 import cv2
 import numpy as np
-
-def simplify_with_yellow_focus(frame):
-
-    frame = cv2.convertScaleAbs(frame, alpha=1.5, beta=0)
-
-    palette = np.array([
-        [255,   0,   0],   # Blue
-        [0,     0, 255],   # Red
-        [0,   255,   0],   # Green
-        [0,   255, 255],   # Yellow
-        [255, 255, 255],   # White
-        [0,     0,   0],   # Black
-        [0,   165, 255],   # Orange (helps separate reddish-yellow tones)
-    ], dtype=np.uint8)
-
-    pixels = frame.reshape((-1, 3)).astype(np.float32)
-    distances = np.linalg.norm(pixels[:, None, :] - palette[None, :, :], axis=2)
-    nearest_idx = np.argmin(distances, axis=1)
-    simplified = palette[nearest_idx].reshape(frame.shape).astype(np.uint8)
-
-    # Step 4: Create yellow mask
-    yellow_color = np.array([0, 255, 255], dtype=np.uint8)
-    yellow_mask = cv2.inRange(simplified, yellow_color, yellow_color)
-
-    return simplified, yellow_mask
 
 
 
@@ -502,65 +310,7 @@ def filter_and_smooth(coords, window_size=5, threshold=5):
 
     return smoothed_coords
 
-def shadow_removal(img):
-    rgb_planes = cv2.split(img)
 
-    result_planes = []
-    result_norm_planes = []
-    for plane in rgb_planes:
-        dilated_img = cv2.dilate(plane, np.ones((7, 7), np.uint8))
-        bg_img = cv2.medianBlur(dilated_img, 21)
-        diff_img = 255 - cv2.absdiff(plane, bg_img)
-        norm_img = cv2.normalize(diff_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-        result_planes.append(diff_img)
-        result_norm_planes.append(norm_img)
-
-    result = cv2.merge(result_planes)
-    result_norm = cv2.merge(result_norm_planes)
-    return result_norm
-
-def break_into_primary_colors(frame):
-    """
-    Accepts a cv2 frame (BGR format) and returns three images:
-    one each for Blue, Green, and Red primary channels.
-    """
-    # Split into B, G, R channels
-    b, g, r = cv2.split(frame)
-
-    # Create empty image with same shape
-    zeros = np.zeros_like(b)
-
-    # Merge each primary color
-    blue_img = cv2.merge([b, zeros, zeros])
-    green_img = cv2.merge([zeros, g, zeros])
-    red_img = cv2.merge([zeros, zeros, r])
-
-    return blue_img, green_img, red_img
-
-def preprocess_for_yellow_detection(img, clahe):
-    # Convert to LAB to normalize brightness
-    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-
-    # Apply CLAHE on L channel to reduce shadows
-    l_eq = clahe.apply(l)
-
-    # Merge and convert back to BGR
-    lab_eq = cv2.merge((l_eq, a, b))
-    bgr_eq = cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR)
-
-    # Slightly boost saturation to make colors (like yellow) more vivid
-    hsv = cv2.cvtColor(bgr_eq, cv2.COLOR_BGR2HSV).astype(np.float32)
-    h, s, v = cv2.split(hsv)
-
-    # Increase saturation, but clip to valid range
-    s = np.clip(s * 1.25, 0, 255)
-    v = np.clip(v * 1.05, 0, 255)  # small brightness boost
-
-    hsv_enhanced = cv2.merge((h, s, v)).astype(np.uint8)
-    vibrant_bgr = cv2.cvtColor(hsv_enhanced, cv2.COLOR_HSV2BGR)
-
-    return vibrant_bgr
 
 def equalize_image(img, clahe):
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)

@@ -2,7 +2,6 @@
 
 from django.db.models import CheckConstraint, Q
 import os
-import subprocess
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
@@ -20,10 +19,9 @@ class PetVideos(models.Model):
 
     def __str__(self):
         return self.name
-# --- Delete files when model instance is deleted ---
+
 @receiver(post_delete, sender=PetVideos)
 def delete_files_on_model_delete(sender, instance, **kwargs):
-    """Deletes video files from storage when a PetVideos instance is deleted."""
     for field in ['file', 'processed_file']:
         file_field = getattr(instance, field)
         if file_field and file_field.name:
