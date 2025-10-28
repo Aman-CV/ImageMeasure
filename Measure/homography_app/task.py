@@ -30,7 +30,9 @@ def process_video_task(petvideo_id):
 
     video_path = video_obj.file.path
     original_name = os.path.basename(video_obj.file.name)
-
+    if video_obj.processed_file:
+        video_obj.processed_file.delete(save=False)
+        video_obj.processed_file = None
     output_dir = os.path.join(settings.MEDIA_ROOT, 'post_processed_video')
     os.makedirs(output_dir, exist_ok=True)
 
@@ -53,7 +55,7 @@ def process_video_task(petvideo_id):
             ret, frame = cap.read()
             if not ret:
                 break
-
+            frame = cv2.resize(frame, (1280, 720))
             mask = ankle_crop_color_detection(frame, CLAHE=clahe, model=model)
 
             # (keep your existing tracking logic the same)
@@ -66,7 +68,7 @@ def process_video_task(petvideo_id):
                 if M["m00"] != 0:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
-                    if detected_points[1] < cy or cy < height // 2:
+                    if detected_points[1] < cy or cy < 720 // 2:
                         detected_points = (cx, cy)
 
             trajectory.append(detected_points)
@@ -86,13 +88,13 @@ def process_video_task(petvideo_id):
         np.save("trajectory.npy", trajectory)
         y_smooth = savgol_filter(trajectory[:, 1], window_length=11, polyorder=2)
         dy = np.gradient(y_smooth)
-        dy[np.logical_and(dy > -10, dy < 10)] = 0
-        success, [f1, f2] = get_flat_start(dy)
+        limit_cut = max(dy) / 10
+        dy[np.logical_and(dy > -limit_cut, dy < limit_cut)] = 0
+        success, [f1, f2] = get_flat_start(dy, window=len(dy) // 5)
         print(f1, f2)
         if not success:
             logger.info(f"[process_video_task] Info processing PetVideo ID {petvideo_id}: flats not deteced")
-        data = trajectory[f1[1]: f2[1],:] if success else trajectory
-        start, end = detect_biggest_jump(data[:, 1])
+        start, end = detect_biggest_jump(dy[f1[1]: f2[1]] if success else dy)
         if success and start and end:
             end, start = end + f1[1], start + f1[1]
         else:
@@ -132,6 +134,7 @@ def process_video_task(petvideo_id):
             ret, frame = cap.read()
             if not ret:
                 break
+            frame = cv2.resize(frame, (1280, 720))
             if start <= traj_cnt <= end:
                 overlay = frame.copy()
                 overlay[:] = (0, 0, 160)  # BGR red
@@ -146,7 +149,7 @@ def process_video_task(petvideo_id):
                     cv2.circle(frame, (x, y), 4, (0, 255, 0), -1)
                     cv2.putText(frame, f"{i}ft", (x + 6, y - 6),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-
+            frame = cv2.resize(frame, (width, height))
             out.write(frame )
         cap.release()
         out.release()

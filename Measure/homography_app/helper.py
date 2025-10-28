@@ -6,7 +6,7 @@ TOL_H, TOL_S, TOL_V = 20, 50, 50
 
 from scipy import interpolate, signal
 from scipy.signal import savgol_filter, find_peaks
-
+import json
 import math
 
 
@@ -22,8 +22,8 @@ def clamp_box(x1, y1, x2, y2, w, h):
 
 def get_ankle_mask(frame, clahe=None):
     h, w = frame.shape[:2]
-    half_h = h // 2
-    # target lower half cuz legs are in lower half
+    half_h = 0
+    # target full ankle
     lower_half = frame[half_h:h, :]
 
     #  basic BGR colors
@@ -190,15 +190,15 @@ def merge_close_regions(regions, max_gap=2):
     return merged
 
 
-def get_flat_start(y, window=30, tol=10):
+def get_flat_start(y, window=30):
 
     flat_regions = []
     i = 0
     while i <= len(y) - window:
         segment = y[i:i+window]
-        if np.max(segment) - np.min(segment) < tol:  # small variation => flat
+        if np.all(segment == 0):
             flat_regions.append((i, i + window))
-            i += window  # skip to avoid overlapping regions
+            i += window
         else:
             i += 1
     flat_regions = merge_close_regions(flat_regions)
@@ -243,10 +243,7 @@ def distance_from_homography(pt1, pt2, H):
 
     return float(distance)
 
-def detect_biggest_jump(y, smooth_window=11, smooth_poly=2, start_thresh=-1.5, end_thresh=0):
-    y_smooth = savgol_filter(y, window_length=smooth_window, polyorder=smooth_poly)
-    dy = np.gradient(y_smooth)
-    dy[np.logical_and(dy > -10, dy < 10)] = 0
+def detect_biggest_jump(dy, smooth_window=11, smooth_poly=2, start_thresh=-1.5, end_thresh=0):
     start , end = 0 , len(dy)
     while start < len(dy) and dy[start] == 0:
         start += 1
@@ -263,7 +260,6 @@ import numpy as np
 
 
 
-# Function: world → image projection using cv2.perspectiveTransform
 def world_to_image(points, H):
     pts = np.array(points, dtype=np.float32).reshape(-1, 1, 2)  # (N,1,2)
     projected = cv2.perspectiveTransform(pts, H)
@@ -272,11 +268,10 @@ def world_to_image(points, H):
 def filter_and_smooth(coords, window_size=5, threshold=5):
     coords = np.array(coords, dtype=np.float64)
     N = len(coords)
-
-    # Step 1: Robust outlier detection using rolling median
+    if N == 0:
+        return coords
     coords_filtered = coords.copy()
     for i in range(N):
-        # Define local window boundaries
         start = max(0, i - window_size)
         end = min(N, i + window_size + 1)
 
@@ -285,8 +280,6 @@ def filter_and_smooth(coords, window_size=5, threshold=5):
 
         if distance > threshold:
             coords_filtered[i] = np.array([np.nan, np.nan])
-
-    # Step 2: Interpolation over NaN points
     valid_mask = ~np.isnan(coords_filtered[:, 0])
     x_valid = np.where(valid_mask)[0]
     y_valid = coords_filtered[valid_mask]
@@ -302,7 +295,6 @@ def filter_and_smooth(coords, window_size=5, threshold=5):
     x_all = np.arange(N)
     coords_interpolated = np.vstack((interp_func_x(x_all), interp_func_y(x_all))).T
 
-    # Step 3: Smoothing with Savitzky-Golay filter
     smoothed_x = signal.savgol_filter(coords_interpolated[:, 0], window_length=7, polyorder=2, mode='nearest')
     smoothed_y = signal.savgol_filter(coords_interpolated[:, 1], window_length=7, polyorder=2, mode='nearest')
 
@@ -316,10 +308,8 @@ def equalize_image(img, clahe):
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
 
-    # Apply CLAHE to L channel (enhances brightness, reduces shadows)
     l_eq = clahe.apply(l)
 
-    # Merge back and convert to BGR
     lab_eq = cv2.merge((l_eq, a, b))
     enhanced_frame = cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR)
     return enhanced_frame
