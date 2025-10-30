@@ -10,6 +10,19 @@ import json
 import math
 
 
+def correct_white_balance(img):
+    result = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+
+    avg_a = np.average(result[:, :, 1])
+
+    avg_b = np.average(result[:, :, 2])
+
+    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 2.)
+
+    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 2.)
+
+    return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+
 
 def clamp_box(x1, y1, x2, y2, w, h):
     x1 = max(0, min(w - 1, int(x1)))
@@ -421,3 +434,176 @@ def detect_and_measure_image(image_path, output_path, homography):
         return dist_cm
     else:
         return None
+
+
+
+def detect_carpet_segment(frame, selected_point=None):
+
+    h, w, _ = frame.shape
+    lower_half = frame[h // 2:, :]
+
+    hsv = cv2.cvtColor(lower_half, cv2.COLOR_BGR2HSV)
+
+    DEFAULT_HSV = np.array([172, 180, 180], dtype=np.uint8)
+    TOL_H, TOL_S, TOL_V = 20, 50, 50
+
+    center = DEFAULT_HSV.astype(int)
+    lower_hsv = np.array([0, 0, 0], dtype=np.uint8)
+    upper_hsv = np.array([180, 90, 90], dtype=np.uint8)
+
+    mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
+
+    s_channel = hsv[:, :, 1]
+    mask[s_channel < 40] = 0
+
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    if num_labels > 1:
+        largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+        mask = np.uint8(labels == largest_label) * 255
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    segment_mask = np.zeros((h, w), dtype=np.uint8)
+
+    if contours:
+        selected_contour = None
+
+        if selected_point:
+            px, py = selected_point
+            if py >= h // 2:
+                py_adj = py - h // 2
+                min_dist = float("inf")
+                for cnt in contours:
+                    M = cv2.moments(cnt)
+                    if M["m00"] == 0:
+                        continue
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
+                    dist = np.hypot(px - cx, py_adj - cy)
+                    if dist < min_dist:
+                        min_dist = dist
+                        selected_contour = cnt
+            else:
+                selected_contour = max(contours, key=cv2.contourArea)
+        else:
+            selected_contour = max(contours, key=cv2.contourArea)
+
+        if selected_contour is not None:
+            cv2.drawContours(segment_mask[h // 2:, :], [selected_contour], -1, 255, -1)
+
+    segmented_region = cv2.bitwise_and(frame, frame, mask=segment_mask)
+
+    return segment_mask, segmented_region
+
+def separate_color_by_hsv_deprecated(segmented_region, target_hsv=(110, 122, 140), tol_h=20, tol_s=80, tol_v=80):
+
+    hsv = cv2.cvtColor(segmented_region, cv2.COLOR_BGR2HSV)
+
+    h, s, v = target_hsv
+    lower_hsv = np.array([
+        max(h - tol_h, 0),
+        max(s - tol_s, 0),
+        max(v - tol_v, 0)
+    ], dtype=np.uint8)
+    upper_hsv = np.array([
+        min(h + tol_h, 179),
+        min(s + tol_s, 255),
+        min(v + tol_v, 255)
+    ], dtype=np.uint8)
+
+    mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
+
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+
+    separated = cv2.bitwise_and(segmented_region, segmented_region, mask=mask)
+
+    return mask, separated
+
+
+def separate_color_by_hsv(
+    segmented_region,
+    target_hsv=(110, 122, 140),
+    tol_h=40, tol_s=80, tol_v=80
+):
+
+    # Convert to HSV
+    hsv = cv2.cvtColor(segmented_region, cv2.COLOR_BGR2HSV)
+    h, s, v = target_hsv
+
+    # --- Build a fixed color palette ---
+    # target color
+    target_color = np.uint8([[target_hsv]])
+    target_bgr = cv2.cvtColor(target_color, cv2.COLOR_HSV2BGR)[0, 0]
+
+    # two dark tones
+    dark_gray = np.array([50, 50, 50], dtype=np.uint8)
+    black = np.array([0, 0, 0], dtype=np.uint8)
+
+    palette = np.array([target_bgr, dark_gray, black], dtype=np.uint8)
+
+    img = segmented_region.reshape((-1, 3)).astype(np.float32)
+
+    distances = np.linalg.norm(img[:, None, :] - palette[None, :, :].astype(np.float32), axis=2)
+    labels = np.argmin(distances, axis=1)
+
+    target_cluster = 0  # index 0 = target color
+    mask = np.where(labels == target_cluster, 255, 0).astype(np.uint8)
+    mask = mask.reshape(segmented_region.shape[:2])
+
+    # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    # mask = cv2.erode(mask, np.ones((3, 3), np.uint8), iterations=1)
+
+    separated = cv2.bitwise_and(segmented_region, segmented_region, mask=mask)
+
+    return mask, separated
+
+
+def get_mask_centers(mask, return_largest=False):
+
+
+    mask_bin = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
+
+    contours, _ = cv2.findContours(mask_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None if return_largest else []
+
+    centers = []
+    for cnt in contours:
+        M = cv2.moments(cnt)
+        if M["m00"] == 0:
+            continue
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
+        centers.append((cx, cy))
+
+    if not centers:
+        return None if return_largest else []
+
+    if return_largest:
+        largest = max(contours, key=cv2.contourArea)
+        M = cv2.moments(largest)
+        if M["m00"] == 0:
+            return None
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
+        return (cx, cy)
+    else:
+        return centers
+
+def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110, 122, 140)):
+
+
+    segment_mask, segmented_region = detect_carpet_segment(frame, selected_point=selected_point)
+
+    if segmented_region is None or np.count_nonzero(segment_mask) == 0:
+        print("No carpet region detected.")
+        return []
+
+    mask, separated = separate_color_by_hsv(segmented_region, target_hsv=target_hsv)
+
+    centers = get_mask_centers(mask, return_largest=False)
+
+    return centers

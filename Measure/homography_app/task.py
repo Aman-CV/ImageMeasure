@@ -9,7 +9,7 @@ import numpy as np
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
-    ankle_crop_color_detection
+    ankle_crop_color_detection, correct_white_balance
 import glob
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
@@ -58,7 +58,6 @@ def process_video_task(petvideo_id):
             frame = cv2.resize(frame, (1280, 720))
             mask = ankle_crop_color_detection(frame, CLAHE=clahe, model=model)
 
-            # (keep your existing tracking logic the same)
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             detected_points = (0, 0)
             for cnt in contours:
@@ -134,6 +133,7 @@ def process_video_task(petvideo_id):
             ret, frame = cap.read()
             if not ret:
                 break
+            frame = correct_white_balance(frame)
             frame = cv2.resize(frame, (1280, 720))
             if start <= traj_cnt <= end:
                 overlay = frame.copy()
@@ -163,7 +163,6 @@ def process_video_task(petvideo_id):
             final_output_path
         ], check=True)
 
-        # Save processed video to model
         with open(final_output_path, 'rb') as f:
             video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
 
@@ -171,7 +170,6 @@ def process_video_task(petvideo_id):
         video_obj.is_video_processed = True
         video_obj.save()
 
-        # Cleanup temporary files
         for path in [temp_output_path, final_output_path]:
             if os.path.exists(path):
                 os.remove(path)
