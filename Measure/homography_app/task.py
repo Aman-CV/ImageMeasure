@@ -27,7 +27,11 @@ def process_video_task(petvideo_id):
     except PetVideos.DoesNotExist:
         logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
         return
-
+    if not video_obj.to_be_processed:
+        with open(video_obj.file.path, 'rb') as f:
+            video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+        logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
+        return
     video_path = video_obj.file.path
     original_name = os.path.basename(video_obj.file.name)
     if video_obj.processed_file:
@@ -45,6 +49,7 @@ def process_video_task(petvideo_id):
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
+        #temp = cv2.VideoWriter("this.mp4", fourcc, fps, (width, height))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         trajectory = []
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
@@ -55,20 +60,37 @@ def process_video_task(petvideo_id):
             ret, frame = cap.read()
             if not ret:
                 break
+            frame = correct_white_balance(frame)
             frame = cv2.resize(frame, (1280, 720))
             mask = ankle_crop_color_detection(frame, CLAHE=clahe, model=model)
+            mask_color = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
+            #temp.write(mask_color)
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
             detected_points = (0, 0)
+
+            # find largest contour
+            largest_contour = None
+            max_area = 0
+
             for cnt in contours:
                 if cnt is None or len(cnt) == 0:
                     continue
-                M = cv2.moments(cnt)
+                area = cv2.contourArea(cnt)
+                if area > max_area:
+                    max_area = area
+                    largest_contour = cnt
+
+            if largest_contour is not None:
+                M = cv2.moments(largest_contour)
                 if M["m00"] != 0:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
                     if detected_points[1] < cy or cy < 720 // 2:
                         detected_points = (cx, cy)
+
+            # cv2.drawContours(frame, [largest_contour], -1, (0, 255, 0), 2)
 
             trajectory.append(detected_points)
             current_frame += 1
@@ -153,7 +175,7 @@ def process_video_task(petvideo_id):
             out.write(frame )
         cap.release()
         out.release()
-
+        #temp.release()
         # --- ffmpeg encode ---
         import subprocess
         subprocess.run([

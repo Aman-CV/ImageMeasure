@@ -1,15 +1,15 @@
 import json
 import os
-
 from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 import cv2
 import numpy as np
+import time
 from sklearn.utils import deprecated
 import tempfile
 from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_points_anticlockwise, \
-    process_frame_for_color_centers
+    process_frame_for_color_centers, correct_white_balance
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .task import process_video_task
 from django.conf import settings
@@ -23,11 +23,18 @@ def upload_video(request):
         # Get extra fields from POST
         participant_name = request.POST.get('participant_name', 'NoName')
         pet_type = request.POST.get('pet_type', 'BT')
+        duration = float(request.POST.get('duration', 0))
+        to_be_processed = False
+        if pet_type == 'BROAD_JUMP' or pet_type == "SIT_THROW" or pet_type == "SIT_REACH":
+            to_be_processed = True
         obj = PetVideos.objects.create(
             name=video.name,
             file=video,
             participant_name=participant_name,
-            pet_type=pet_type
+            pet_type=pet_type,
+            duration=duration,
+            progress= 0 if to_be_processed else 100,
+            to_be_processed = to_be_processed
         )
         process_video_task(obj.id)
         return JsonResponse({
@@ -51,7 +58,7 @@ def upload_calibration_video(request):
             temp.flush()
             os.fsync(temp.fileno())
             temp_path = temp.name
-
+        time.sleep(0.1)
         cap = None
         for _ in range(3):
             cap = cv2.VideoCapture(temp_path)
@@ -78,6 +85,7 @@ def upload_calibration_video(request):
         middle_frame_index = total_frames // 2
         cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
         ret, frame = cap.read()
+        frame = correct_white_balance(frame)
         cap.release()
         os.remove(temp_path)
 
@@ -361,7 +369,7 @@ def process_image(request):
 def list_videos(request):
     videos = PetVideos.objects.all().order_by('-uploaded_at')
     data = [{'name': v.name, 'file': v.file.url, 'distance': v.distance,
-             'participant_name': v.participant_name, "pet_type": v.pet_type, 'id': v.id, 'is_processed': v.is_video_processed, "progress": v.progress} for v
+             'participant_name': v.participant_name, "pet_type": v.pet_type, 'id': v.id, 'is_processed': v.is_video_processed, "progress": v.progress, 'duration': v.duration, 'to_be_processed': v.to_be_processed} for v
             in videos]
     return JsonResponse({'videos': data})
 

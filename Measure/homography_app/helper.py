@@ -1,5 +1,5 @@
 import numpy as np
-
+import cv2
 
 DEFAULT_HSV = np.array([172, 180, 180], dtype=np.uint8)
 TOL_H, TOL_S, TOL_V = 20, 50, 50
@@ -22,6 +22,7 @@ def correct_white_balance(img):
     result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 2.)
 
     return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+
 
 
 def clamp_box(x1, y1, x2, y2, w, h):
@@ -444,19 +445,41 @@ def detect_carpet_segment(frame, selected_point=None):
 
     hsv = cv2.cvtColor(lower_half, cv2.COLOR_BGR2HSV)
 
-    DEFAULT_HSV = np.array([172, 180, 180], dtype=np.uint8)
-    TOL_H, TOL_S, TOL_V = 20, 50, 50
+    DEFAULT_HSV = np.array([80, 80, 40], dtype=np.uint8)
+    TOL_H, TOL_S, TOL_V = 25, 200, 65
 
     center = DEFAULT_HSV.astype(int)
-    lower_hsv = np.array([0, 0, 0], dtype=np.uint8)
-    upper_hsv = np.array([180, 90, 90], dtype=np.uint8)
 
+    # --- compute tolerance-based range safely ---
+    lower_hsv = np.array([
+        max(center[0] - TOL_H, 0),
+        max(center[1] - TOL_S, 0),
+        max(center[2] - TOL_V, 0)
+    ], dtype=np.uint8)
+
+    upper_hsv = np.array([
+        min(center[0] + TOL_H, 179),
+        min(center[1] + TOL_S, 255),
+        min(center[2] + TOL_V, 255)
+    ], dtype=np.uint8)
+
+    lower_hsv = np.array([
+        0, 0, 0
+    ], dtype=np.uint8)
+
+    upper_hsv = np.array([
+        179, 255, 65
+    ], dtype=np.uint8)
+    # --- Mask for target color ---
     mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
 
+    # --- Ignore white/desaturated areas ---
     s_channel = hsv[:, :, 1]
     mask[s_channel < 40] = 0
 
+    # --- Clean mask carefully ---
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
 
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
     if num_labels > 1:
@@ -552,7 +575,7 @@ def separate_color_by_hsv(
     mask = np.where(labels == target_cluster, 255, 0).astype(np.uint8)
     mask = mask.reshape(segmented_region.shape[:2])
 
-    # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     # mask = cv2.erode(mask, np.ones((3, 3), np.uint8), iterations=1)
 
@@ -562,7 +585,6 @@ def separate_color_by_hsv(
 
 
 def get_mask_centers(mask, return_largest=False):
-
 
     mask_bin = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
 
@@ -597,7 +619,7 @@ def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110,
 
 
     segment_mask, segmented_region = detect_carpet_segment(frame, selected_point=selected_point)
-
+    cv2.imwrite("temp.jpg", segmented_region)
     if segmented_region is None or np.count_nonzero(segment_mask) == 0:
         print("No carpet region detected.")
         return []
