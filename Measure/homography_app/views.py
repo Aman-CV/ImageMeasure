@@ -58,13 +58,13 @@ def upload_calibration_video(request):
             temp.flush()
             os.fsync(temp.fileno())
             temp_path = temp.name
-        time.sleep(0.1)
+        time.sleep(0.2)
         cap = None
         for _ in range(3):
             cap = cv2.VideoCapture(temp_path)
             if cap.isOpened():
                 break
-            time.sleep(0.1)
+            time.sleep(0.2)
 
         if not cap or not cap.isOpened():
             os.remove(temp_path)

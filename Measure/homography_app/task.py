@@ -62,33 +62,26 @@ def process_video_task(petvideo_id):
                 break
             frame = correct_white_balance(frame)
             frame = cv2.resize(frame, (1280, 720))
-            mask = ankle_crop_color_detection(frame, CLAHE=clahe, model=model)
+            mask, ankle_points = ankle_crop_color_detection(frame, CLAHE=clahe, model=model)
             mask_color = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
             #temp.write(mask_color)
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            detected_points = (0, 0)
-
-            # find largest contour
-            largest_contour = None
-            max_area = 0
-
+            detected_points = [0, 0] if len(ankle_points) < 2 else list(ankle_points[-1])
+            offset = 5 #pixel
+            detected_points[-1] = offset + detected_points[-1]
             for cnt in contours:
                 if cnt is None or len(cnt) == 0:
                     continue
-                area = cv2.contourArea(cnt)
-                if area > max_area:
-                    max_area = area
-                    largest_contour = cnt
 
-            if largest_contour is not None:
-                M = cv2.moments(largest_contour)
+                M = cv2.moments(cnt)
                 if M["m00"] != 0:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
+
                     if detected_points[1] < cy or cy < 720 // 2:
-                        detected_points = (cx, cy)
+                        detected_points = [cx, cy]
 
             # cv2.drawContours(frame, [largest_contour], -1, (0, 255, 0), 2)
 
@@ -97,7 +90,7 @@ def process_video_task(petvideo_id):
             if total_frames > 0:
                 progress = int((current_frame / total_frames) * 100)
                 if progress >= last_logged_progress + 10:
-                    video_obj.  progress = progress
+                    video_obj.progress = progress
                     video_obj.save(update_fields=["progress"])
                     last_logged_progress = progress
 
@@ -122,7 +115,8 @@ def process_video_task(petvideo_id):
             start, end = 0, len(trajectory) - 1
         pt1 = trajectory[start if start else 0, :]
         pt2 = trajectory[end if end else len(trajectory) - 1, :]
-        pt2[1] = pt1[1]
+        pt1[-1] += 3
+        pt2[-1] += 3 #offset correction
         print(pt1, pt2)
         trajectory = [tuple(map(int, point)) for point in trajectory]
         #sorted_points = sorted(trajectory, key=lambda p: p[1], reverse=True)
@@ -140,6 +134,7 @@ def process_video_task(petvideo_id):
             H = np.array(json.load(f), dtype=np.float32)
         print(H)
         distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
+        pt2[1] = pt1[1]
         img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
         world_line = cv2.perspectiveTransform(img_line, H)[0]
         p1, p2 = world_line
@@ -190,6 +185,7 @@ def process_video_task(petvideo_id):
 
         video_obj.distance = distance_ft
         video_obj.is_video_processed = True
+        video_obj.progress = 100
         video_obj.save()
 
         for path in [temp_output_path, final_output_path]:

@@ -10,7 +10,29 @@ import json
 import math
 
 
-def correct_white_balance(img):
+
+def correct_white_balance(img, strength=1.8):
+    # Convert to LAB color space
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+
+    # Compute averages for a and b channels
+    avg_a = np.average(lab[:, :, 1])
+    avg_b = np.average(lab[:, :, 2])
+
+    # Calculate correction strength (lower = gentler)
+    correction_scale = (lab[:, :, 0] / 255.0) * strength
+
+    # Apply correction with clamping to avoid extreme shifts
+    lab[:, :, 1] = np.clip(lab[:, :, 1] - ((avg_a - 128) * correction_scale), 0, 255)
+    lab[:, :, 2] = np.clip(lab[:, :, 2] - ((avg_b - 128) * correction_scale), 0, 255)
+
+    # Convert back to BGR
+    balanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+    return balanced
+
+
+def correct_white_balance_deprecated(img):
     result = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
     avg_a = np.average(result[:, :, 1])
@@ -35,17 +57,17 @@ def clamp_box(x1, y1, x2, y2, w, h):
 
 
 def get_ankle_mask(frame, clahe=None):
+    # Get image dimensions
     h, w = frame.shape[:2]
     half_h = 0
-    # target full ankle
     lower_half = frame[half_h:h, :]
 
-    #  basic BGR colors
+    # Define 7 basic BGR colors
     basic_bgr = np.uint8([
         [0, 0, 255],    # red
         [0, 69, 255],   # orange
         [0, 255, 255],  # yellow
-        [0, 255, 0],    # green
+        [0, 200, 0],    # green
         [255, 0, 0],    # blue
         [130, 0, 75],   # indigo
         [238, 130, 238],# violet
@@ -89,6 +111,7 @@ def get_ankle_mask(frame, clahe=None):
 
 
 
+
 def ankle_crop_color_detection(frame, CLAHE=None, model=None, CROP_HALF=32):
     h, w = frame.shape[:2]
 
@@ -122,7 +145,7 @@ def ankle_crop_color_detection(frame, CLAHE=None, model=None, CROP_HALF=32):
         mask_full[y1:y2, x1:x2] = cv2.bitwise_or(mask_full[y1:y2, x1:x2], yellow_mask)
 
 
-    return mask_full
+    return mask_full, ankle_keypoints
 
 
 
