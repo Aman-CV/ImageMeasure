@@ -29,24 +29,32 @@ def upload_video(request):
         participant_name = request.POST.get('participant_name', 'NoName')
         pet_type = request.POST.get('pet_type', 'BT')
         duration = float(request.POST.get('duration', 0))
-        to_be_processed = False
-        if pet_type != "ENDURANCE":
-            to_be_processed = True
-        obj = PetVideos.objects.create(
-            name=video.name,
-            file=video,
-            participant_name=participant_name,
-            pet_type=pet_type,
-            duration=duration,
-            progress= 0 if to_be_processed else 100,
-            to_be_processed = to_be_processed
+        to_be_processed_str = request.POST.get('to_be_processed', 'true').lower()
+        to_be_processed = to_be_processed_str in ('true', '1', 'yes', 'on')
+        test_id = request.POST.get('test_id', "jump")
+        participant_id = request.POST.get('participant_id', 'Dummy')
+        assessment_id = request.POST.get('assessment_id', 'Dummy')
+        obj, created = PetVideos.objects.update_or_create(
+            participant_id=participant_id,
+            test_id=test_id,
+            assessment_id=assessment_id,
+            defaults={
+                'name': video.name,
+                'file': video,
+                'participant_name': participant_name,
+                'pet_type': pet_type,
+                'duration': duration,
+                'progress': 0 if to_be_processed else 100,
+                'to_be_processed': to_be_processed,
+            }
         )
         process_video_task(obj.id)
         return JsonResponse({
             'status': 'success',
             'name': obj.name,
             'participant_name': obj.participant_name,
-            'pet_type': obj.pet_type
+            'pet_type': obj.pet_type,
+            'updated': not created  # True if it overwrote an existing record
         })
 
     return JsonResponse({'status': 'error'}, status=400)
@@ -373,6 +381,31 @@ def process_image(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def list_videos_by_assessment_and_test(request):
+    assessment_id = request.GET.get('assessment_id')  or 'dummy'
+    test_id = request.GET.get('test_id') or 'jump'
+
+    videos = PetVideos.objects.filter(
+        assessment_id=assessment_id,
+        test_id=test_id
+    ).order_by('-uploaded_at')
+    data = [{
+        'name': v.name,
+        'file': v.file.url if v.file else None,
+        'distance': v.distance,
+        'participant_name': v.participant_name,
+        'pet_type': v.pet_type,
+        'id': v.id,
+        'is_processed': v.is_video_processed,
+        'progress': v.progress,
+        'duration': v.duration,
+        'to_be_processed': v.to_be_processed,
+        'participant_id': v.participant_id
+    } for v in videos]
+
+    return JsonResponse({'videos': data})
 
 
 

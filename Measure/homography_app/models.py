@@ -10,6 +10,7 @@ class PetVideos(models.Model):
     name = models.CharField(max_length=255)
     is_video_processed = models.BooleanField(default=False)
     participant_name = models.CharField(max_length=255, default="NoName")
+    participant_id = models.CharField(max_length=64, default="dummy")
     file = models.FileField(upload_to='videos/')
     distance = models.FloatField(default=0)
     duration = models.IntegerField(default=0)
@@ -18,6 +19,8 @@ class PetVideos(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     progress = models.PositiveSmallIntegerField(default=0)
     to_be_processed = models.BooleanField(default=False)
+    assessment_id = models.CharField(max_length=64, default="dummy")
+    test_id = models.CharField(max_length=64, default="jump")
 
     def __str__(self):
         return self.name
