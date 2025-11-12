@@ -56,13 +56,16 @@ and distance is captured based on positon of marker attached to participants sho
 ## END POINTS
 
 ### POST /upload_video
-Uploads a participant’s video. Depedning on whether test type requires distance calculation or not, the video is sent for processing.
+Uploads a participant’s video. Depedning on whether test type requires distance calculation or not, the video is sent for processing. Should the assessment_id, test_id and participant_id already exist in database the function will update that instead of creating new object
 
 Form data
 - `video` (File, required) – Video file
 - `participant_name` (String, optional) – Default: "NoName"
 - `pet_type` (String, optional) – Default: "BT"
 - `duration` (Float, optional) – Default: 0
+- `assessment_id` (String, optional) - Default : dummy
+- `participant_id` (String, optinoal) - Default : dummy
+- `to_be_progressed` (bool) - Default : False (if its true the measured quantity is distance)
 
 Success response 
 ```
@@ -158,6 +161,34 @@ Success Response
 Error Response
 ```
 {"status" : "error description"}
+```
+
+### GET /list_videos_by_assessment_and_test
+Fetch and return list of uploads fileterd by assessment_id and test_id
+
+Query Params:
+`assessment_id` (String, required) - default dummy
+`test_id` (String, required) - default jump
+
+Success Response
+```
+{
+  "videos": [
+    {
+      "name": "Jump Trial 1",
+      "file": "https://example.com/media/videos/jump1.mp4",
+      "distance": 3.2,
+      "participant_name": "Buddy",
+      "pet_type": "Dog",
+      "id": 12,
+      "is_processed": true,
+      "progress": 100,
+      "duration": 15.4,
+      "to_be_processed": false,
+      "participant_id": "P123"
+    }
+  ]
+}
 ```
 
 ### POST /process_image
