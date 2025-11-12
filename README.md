@@ -179,7 +179,7 @@ Success Response
       "file": "https://example.com/media/videos/jump1.mp4",
       "distance": 3.2,
       "participant_name": "Buddy",
-      "pet_type": "Dog",
+      "pet_type": "broad jump",
       "id": 12,
       "is_processed": true,
       "progress": 100,
