@@ -19,9 +19,10 @@ logger = logging.getLogger('homography_app')
 
 
 @background(schedule=0, remove_existing_tasks=True)
-def process_video_task(petvideo_id, use_only_ankle_pos=False, use_only_end_frame=False):
+def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True):
     logger.info(f"[process_video_task] Starting processing for PetVideo ID: {petvideo_id}")
-
+    logger.info(f"[process_video_task] color_marker_tracking is {enable_color_marker_tracking}")
+    logger.info(f"[process_video_task] jump detection is {enable_start_end_detector}")
     try:
         video_obj = PetVideos.objects.get(id=petvideo_id)
     except PetVideos.DoesNotExist:
@@ -80,7 +81,8 @@ def process_video_task(petvideo_id, use_only_ankle_pos=False, use_only_end_frame
                     cy = int(M["m01"] / M["m00"])
 
                     if detected_points[1] < cy or cy < 720 // 2:
-                        detected_points = [cx, cy]
+                        if enable_color_marker_tracking:
+                            detected_points = [cx, cy]
 
             # cv2.drawContours(frame, [largest_contour], -1, (0, 255, 0), 2)
 
@@ -108,7 +110,7 @@ def process_video_task(petvideo_id, use_only_ankle_pos=False, use_only_end_frame
         if not success:
             logger.info(f"[process_video_task] Info processing PetVideo ID {petvideo_id}: flats not deteced")
         start, end = detect_biggest_jump(dy[f1[1]: f2[1]] if success else dy)
-        if success and start and end:
+        if success and start and end and enable_start_end_detector:
             end, start = end + f1[1], start + f1[1]
         else:
             start, end = 0, len(trajectory) - 1
@@ -116,8 +118,9 @@ def process_video_task(petvideo_id, use_only_ankle_pos=False, use_only_end_frame
         pt2 = trajectory[end if end else len(trajectory) - 1, :]
         pt1[0] -= 5
         pt2[0] -= 5
-        pt1[-1] += 10
-        pt2[-1] += 10 #offset correction to get marked point closer to ground and heels
+        y_offset = 10
+        pt1[-1] += y_offset
+        pt2[-1] += y_offset #offset correction to get marked point closer to ground and heels
         print(pt1, pt2)
         trajectory = [tuple(map(int, point)) for point in trajectory]
         #sorted_points = sorted(trajectory, key=lambda p: p[1], reverse=True)

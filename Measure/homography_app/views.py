@@ -34,6 +34,10 @@ def upload_video(request):
         test_id = request.POST.get('test_id', "jump")
         participant_id = request.POST.get('participant_id', 'Dummy')
         assessment_id = request.POST.get('assessment_id', 'Dummy')
+        enable_start_end_detector = request.POST.get('enable_start_end_detector', 'true').lower()
+        enable_color_marker_tracking = request.POST.get('enable_color_marker_tracking', 'true').lower()
+        enable_start_end_detector = enable_start_end_detector in ('true', '1', 'yes', 'on')
+        enable_color_marker_tracking = enable_color_marker_tracking in ('true', '1', 'yes', 'on')
         obj, created = PetVideos.objects.update_or_create(
             participant_id=participant_id,
             test_id=test_id,
@@ -48,7 +52,7 @@ def upload_video(request):
                 'to_be_processed': to_be_processed,
             }
         )
-        process_video_task(obj.id)
+        process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector)
         return JsonResponse({
             'status': 'success',
             'name': obj.name,

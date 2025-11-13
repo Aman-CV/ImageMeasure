@@ -484,7 +484,7 @@ def detect_carpet_segment(frame, selected_point=None):
     hsv = cv2.cvtColor(lower_half, cv2.COLOR_BGR2HSV)
 
     DEFAULT_HSV = np.array([80, 80, 40], dtype=np.uint8)
-    TOL_H, TOL_S, TOL_V = 25, 200, 65
+    TOL_H, TOL_S, TOL_V = 25, 200, 75
 
     center = DEFAULT_HSV.astype(int)
 
@@ -506,7 +506,7 @@ def detect_carpet_segment(frame, selected_point=None):
     ], dtype=np.uint8)
 
     upper_hsv = np.array([
-        179, 255, 65
+        179, 255, 75
     ], dtype=np.uint8)
     # --- Mask for target color ---
     mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
