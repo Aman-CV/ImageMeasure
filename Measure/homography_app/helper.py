@@ -117,16 +117,31 @@ def ankle_crop_color_detection(frame, CLAHE=None, model=None, CROP_HALF=32):
 
     # Run YOLO pose detection
     results = model.predict(frame, conf=0.25, verbose=False)
-    ankle_keypoints = []
+
+    highest_y = -1
+    best_person_ankles = []
 
     for r in results:
         if hasattr(r, 'keypoints') and r.keypoints is not None:
             kps = r.keypoints.xy  # (num_people, num_kpts, 2)
+
             for person_kps in kps:
-                for idx in [15, 16]:  # 16  = right ankkll
+                person_ankles = []
+                max_y_this_person = -1
+
+                # (15 = left, 16 = right)
+                for idx in [15, 16]:
                     if idx < len(person_kps):
                         x_px, y_px = person_kps[idx]
-                        ankle_keypoints.append((int(x_px), int(y_px)))
+                        person_ankles.append((int(x_px), int(y_px)))
+                        if y_px > max_y_this_person:
+                            max_y_this_person = y_px
+
+                if max_y_this_person > highest_y:
+                    highest_y = max_y_this_person
+                    best_person_ankles = person_ankles
+
+    ankle_keypoints = best_person_ankles
 
     mask_full = np.zeros((h, w), dtype=np.uint8)
 

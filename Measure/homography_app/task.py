@@ -19,7 +19,7 @@ logger = logging.getLogger('homography_app')
 
 
 @background(schedule=0, remove_existing_tasks=True)
-def process_video_task(petvideo_id):
+def process_video_task(petvideo_id, use_only_ankle_pos=False, use_only_end_frame=False):
     logger.info(f"[process_video_task] Starting processing for PetVideo ID: {petvideo_id}")
 
     try:
@@ -29,6 +29,8 @@ def process_video_task(petvideo_id):
         return
     if not video_obj.to_be_processed:
         with open(video_obj.file.path, 'rb') as f:
+            video_obj.is_video_processed = True
+            video_obj.progress = 100
             video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
         logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
         return
@@ -101,7 +103,7 @@ def process_video_task(petvideo_id):
         dy = np.gradient(y_smooth)
         limit_cut = max(dy) / 10
         dy[np.logical_and(dy > -limit_cut, dy < limit_cut)] = 0
-        success, [f1, f2] = get_flat_start(dy, window=len(dy) // 5)
+        success, [f1, f2] = get_flat_start(dy, window=len(dy) // 10)
         print(f1, f2)
         if not success:
             logger.info(f"[process_video_task] Info processing PetVideo ID {petvideo_id}: flats not deteced")
