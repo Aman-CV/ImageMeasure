@@ -57,13 +57,11 @@ def detect_yellow_strip_positions_mask(frame, mask, hz, margin_ratio=0.05, max_h
 
     yellow_mask_full = np.zeros((h, w), dtype=np.uint8)
     yellow_mask_full[y_top:y_bottom, :] = yellow_mask
-
+    cv2.imwrite("this_strip.jpg", yellow_mask_full)
 
     return yellow_mask_full
 
 def find_three_centers_from_mask(yellow_mask_full):
-
-
     contours, _ = cv2.findContours(
         yellow_mask_full, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
@@ -72,18 +70,28 @@ def find_three_centers_from_mask(yellow_mask_full):
         return []
 
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
-
-    centers = []
-
-    for cnt in contours[:3]:
+    contour_centroids = []
+    for cnt in contours:
         M = cv2.moments(cnt)
         if M["m00"] == 0:
             continue
         cx = int(M["m10"] / M["m00"])
         cy = int(M["m01"] / M["m00"])
-        centers.append((cx, cy))
+        x, y, w, h = cv2.boundingRect(cnt)
+        aspect_ratio = w / float(h) if h != 0 else 0
+        if aspect_ratio < 0.4:
+            continue
+        contour_centroids.append((cnt, cx, cy))
+
+    if not contour_centroids:
+        return []
+
+    contour_centroids.sort(key=lambda c: c[1], reverse=True)
+
+    centers = [(cx, cy) for (_, cx, cy) in contour_centroids[:3]]
 
     return centers
+
 
 
 

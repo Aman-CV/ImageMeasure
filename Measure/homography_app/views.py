@@ -72,7 +72,7 @@ def upload_calibration_video(request):
     """
     if request.method == 'POST' and request.FILES.get('video'):
         video_file = request.FILES['video']
-        testId = request.POST.get('test_id', "not_sit_and_reach")
+        test_id = request.POST.get('test_id', "not_sit_and_reach")
         unit_distance = float(request.POST.get('square_size', 0.984252))
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp:
@@ -119,7 +119,7 @@ def upload_calibration_video(request):
             }, status=400)
         frame = cv2.resize(frame, (1280, 720))
         cv2.imwrite("cal.jpg", frame)
-        if testId == "vPbXoPK4":
+        if test_id == "vPbXoPK4":
             mask, _, _  = detect_carpet_segment_p(frame)
             singleton = SingletonHomographicMatrixModel.load()
             _, buffer = cv2.imencode('.jpg', mask)
@@ -466,13 +466,20 @@ def get_video_detail(request):
 
 
 def get_homograph(request):
+    test_id = request.GET.get('test_id', "not_sit_and_reach")
     homograph_obj = SingletonHomographicMatrixModel.load()
-    response_data = {
-        'square_size': homograph_obj.unit_distance,
-        'matrix_url': homograph_obj.matrix.url if homograph_obj.matrix else "",
-        'image_url': homograph_obj.file.url if homograph_obj.file else "",
-    }
-
+    if test_id != "vPbXoPK4":
+        response_data = {
+            'square_size': homograph_obj.unit_distance,
+            'matrix_url': homograph_obj.matrix.url if homograph_obj.matrix else "",
+            'image_url': homograph_obj.file.url if homograph_obj.file else "",
+        }
+    else:
+        response_data = {
+            'square_size': homograph_obj.unit_distance,
+            'matrix_url': homograph_obj.matrix.url if homograph_obj.matrix else "",
+            'image_url': homograph_obj.mask.url if homograph_obj.mask else "",
+        }
     return JsonResponse({
         'status' : 'success',
         'calibration_info': response_data

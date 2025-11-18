@@ -55,12 +55,13 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             homograph_obj = SingletonHomographicMatrixModel.load()
             mask_path = homograph_obj.mask.path
             mask_img = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+            mask_img = cv2.resize(mask_img, (1280, 720))
             distance = 1
             while True:
                 ret, frame = cap.read()
                 if not ret:
                     break
-
+                frame = cv2.resize(frame, (1280, 720))
                 f1 = detect_yellow_strip_positions_mask(frame, mask_img, int(720 * 0.75))
                 x = find_three_centers_from_mask(f1)
 
@@ -88,7 +89,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             with open(final_output_path, 'rb') as f:
                 video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
 
-            video_obj.distance = distance
+            video_obj.distance = round(distance, 2)
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.save()
