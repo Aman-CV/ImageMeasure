@@ -6,6 +6,7 @@ from django.core.files import File
 import cv2
 import json
 import numpy as np
+
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
@@ -89,7 +90,11 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             with open(final_output_path, 'rb') as f:
                 video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
 
-            video_obj.distance = round(distance, 2)
+            if not distance:
+                logger.info(f"[process_video_task] All markers not detected: {petvideo_id}")
+            else:
+                print(centers_sorted)
+            video_obj.distance = round(distance if distance else 0, 2)
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.save()

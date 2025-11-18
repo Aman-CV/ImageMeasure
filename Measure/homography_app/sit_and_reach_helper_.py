@@ -23,7 +23,7 @@ def estimate_distance_between_points(centers, known_distance_cm=15):
 
     return est_d23_cm
 
-def detect_yellow_strip_positions_mask(frame, mask, hz, margin_ratio=0.05, max_hits=3):
+def detect_yellow_strip_positions_mask(frame, mask, hz, margin_ratio=0.02, max_hits=3):
 
 
     h, w = frame.shape[:2]
@@ -39,6 +39,7 @@ def detect_yellow_strip_positions_mask(frame, mask, hz, margin_ratio=0.05, max_h
 
     yellow = np.array([0, 255, 255], dtype=np.uint8)
     dark_gray = np.array([40, 40, 40], dtype=np.uint8)
+    grey = np.array([80, 80, 80], dtype=np.uint8)
     black = np.array([0, 0, 0], dtype=np.uint8)
 
     palette = np.array([yellow, dark_gray, black, yellow], dtype=np.uint8)
@@ -58,6 +59,9 @@ def detect_yellow_strip_positions_mask(frame, mask, hz, margin_ratio=0.05, max_h
     yellow_mask_full = np.zeros((h, w), dtype=np.uint8)
     yellow_mask_full[y_top:y_bottom, :] = yellow_mask
     cv2.imwrite("this_strip.jpg", yellow_mask_full)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    yellow_mask_full = cv2.morphologyEx(yellow_mask_full, cv2.MORPH_OPEN, kernel)
+    cv2.imwrite("this_strip_morph.jpg", yellow_mask_full)
 
     return yellow_mask_full
 
