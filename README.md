@@ -109,11 +109,12 @@ Error Response
 
 
 ### POST /calibrate
-Uploads a calibration video, extracts a frame, detects calibration points, and computes a homography matrix.
+Uploads a calibration video, extracts a frame, detects calibration points, and computes a homography matrix. For sit and reach just captures the black mat , homography is not required
 
 Form data
 - `video` (File, required) – Calibration video
 - `square_size` (Float, optional) – Unit distance (default: 0.984252)
+- `test_id` (String, required) - Test id for which test is done
 
 Success Response 
 ```
@@ -126,6 +127,9 @@ Error Response
 ```
 ### GET /calibration_info
 Returns stored calibration details including matrix and image URLs.
+
+Query Params
+- `test_id` (String, Required) - Test id for which the calibration was done
 
 Success Response
 ```
