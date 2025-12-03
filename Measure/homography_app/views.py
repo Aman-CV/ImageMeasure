@@ -9,10 +9,10 @@ import time
 from sklearn.utils import deprecated
 import tempfile
 from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_points_anticlockwise, \
-    process_frame_for_color_centers, correct_white_balance
+    process_frame_for_color_centers, correct_white_balance, stretch_contrast
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .sit_and_reach_helper_ import detect_carpet_segment_p
-from .task import process_video_task
+from .task import process_video_task, process_sit_and_throw
 from django.conf import settings
 import base64
 
@@ -54,7 +54,10 @@ def upload_video(request):
                 'to_be_processed': to_be_processed,
             }
         )
-        process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id)
+        if test_id == "BwbJyXKl":
+            process_sit_and_throw(obj.id, test_id)
+        else:
+            process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id)
         return JsonResponse({
             'status': 'success',
             'name': obj.name,
@@ -119,6 +122,8 @@ def upload_calibration_video(request):
                 'message': 'Could not extract frame from video'
             }, status=400)
         frame = cv2.resize(frame, (1280, 720))
+        cv2.imwrite("cal_orig.jpg", frame)
+        frame = stretch_contrast(frame)
         cv2.imwrite("cal.jpg", frame)
         if test_id == "vPbXoPK4":
             mask, _, _  = detect_carpet_segment_p(frame)
@@ -138,7 +143,9 @@ def upload_calibration_video(request):
 
             x1 = int(w * position_factor)
             x2 = int(w * (1 - position_factor))
-
+            singleton.unit_distance = unit_distance
+            singleton.end_pixel = max(x1, x2)
+            singleton.start_pixel = min(x1, x2)
             cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)
             cv2.line(frame, (x2, 0), (x2, h), (0, 0, 255), 2)
             _, buffer = cv2.imencode('.jpg', frame)

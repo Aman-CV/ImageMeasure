@@ -45,6 +45,8 @@ class SingletonHomographicMatrixModel(models.Model):
     unit_distance = models.FloatField(default=60)
     hsv_value = models.JSONField(default=dict)
     tracker_hsv_value = models.JSONField(default=dict)
+    start_pixel = models.IntegerField(default=0)
+    end_pixel = models.IntegerField(default=1)
     class Meta:
         constraints = [
             CheckConstraint(

@@ -163,6 +163,17 @@ def ankle_crop_color_detection(frame, CLAHE=None, model=None, CROP_HALF=32):
     return mask_full, ankle_keypoints
 
 
+def stretch_contrast(frame):
+    f = frame.astype(np.float32)
+
+    f = f / 255.0
+
+
+    stretched = 0.5 + (f - 0.5) * 1.2
+
+    stretched = np.clip(stretched, 0, 1)
+
+    return (stretched * 255).astype(np.uint8)
 
 
 def detect_yellow_mask_lab(frame, clahe=None):

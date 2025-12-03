@@ -17,8 +17,62 @@ from ultralytics import YOLO
 
 from .sit_and_reach_helper_ import detect_yellow_strip_positions_mask, find_three_centers_from_mask, \
     estimate_distance_between_points
+from .sit_and_throw_helper import get_first_bounce_frame
 
 logger = logging.getLogger('homography_app')
+
+
+@background(schedule=0, remove_existing_tasks=True)
+def process_sit_and_throw(petvideo_id, test_id=""):
+    if test_id == "":
+        logger.info(f"[process_video_task] INVALID TEST ID: {petvideo_id}")
+        return
+    logger.info(f"[process_video_task] Starting processing for PetVideo ID: {petvideo_id}")
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        return
+    # if not video_obj.to_be_processed:
+    #     with open(video_obj.file.path, 'rb') as f:
+    #         video_obj.is_video_processed = True
+    #         video_obj.progress = 100
+    #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
+    #     return
+    video_path = video_obj.file.path
+    if video_obj.processed_file:
+        video_obj.processed_file.delete(save=False)
+        video_obj.processed_file = None
+    output_dir = os.path.join(settings.MEDIA_ROOT, 'post_processed_video')
+    os.makedirs(output_dir, exist_ok=True)
+    try:
+        with open(video_obj.file.path, 'rb') as f:
+            video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+            video_obj.is_video_processed = False
+            video_obj.progress = 0
+
+
+        cx, cy, cf = get_first_bounce_frame(video_path)
+        if cx is None or cy is None:
+            logger.error(f"[process_sit_and_throw] Error in detecting ball: {petvideo_id}")
+            video_obj.distance = 0
+            video_obj.is_video_processed = True
+            video_obj.progress = 100
+            video_obj.save()
+            return
+        print(cx)
+        homograph_obj = SingletonHomographicMatrixModel.load()
+        video_obj.distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
+        video_obj.is_video_processed = True
+        video_obj.progress = 100
+        video_obj.save()
+
+
+        logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
+
+    except Exception as e:
+        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
 
 
 @background(schedule=0, remove_existing_tasks=True)
@@ -63,13 +117,13 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 if not ret:
                     break
                 frame = cv2.resize(frame, (1280, 720))
-                f1 = detect_yellow_strip_positions_mask(frame, mask_img, int(720 * 0.75))
+                f1 = detect_yellow_strip_positions_mask(frame, mask_img, int(720 * 0.6))
                 x = find_three_centers_from_mask(f1)
 
                 centers_sorted = sorted(x, key=lambda c: c[0], reverse=True)
                 distance = estimate_distance_between_points(centers_sorted)
 
-                y = 3 * height // 4
+                y = int(0.6 * height)
                 dot_length = 10
                 gap = 5
 
