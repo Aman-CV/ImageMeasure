@@ -61,7 +61,7 @@ def process_sit_and_throw(petvideo_id, test_id=""):
             video_obj.progress = 100
             video_obj.save()
             return
-        print(cx)
+        print("s", cx, cy, cf)
         homograph_obj = SingletonHomographicMatrixModel.load()
         video_obj.distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
         video_obj.is_video_processed = True

@@ -4,6 +4,8 @@ import cv2
 
 def get_first_bounce_frame(inp):
     cap = cv2.VideoCapture(inp)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter("oo.mp4", fourcc, cap.get(cv2.CAP_PROP_FPS), (1280, 720))
 
     # Get total frames to determine second half
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -25,6 +27,7 @@ def get_first_bounce_frame(inp):
 
         frame_no += 1
         frame2 = cv2.resize(frame2, (1280, 720))
+        frame2[:, :int(0.15 * frame2.shape[1])] = 0
         gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
         gray2 = cv2.GaussianBlur(gray2, (21, 21), 0)
 
@@ -60,24 +63,74 @@ def get_first_bounce_frame(inp):
             largest_disp, best_contour = max(displacements, key=lambda x: x[0])
             x, y, w, h = cv2.boundingRect(best_contour)
 
+            # --- Extract ROI for circle detection ---
+            roi = frame2[y:y + h, x:x + w]
+            gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+            gray_roi = cv2.GaussianBlur(gray_roi, (7, 7), 0)
+
+            # --- Try to detect a circle inside ROI ---
+            circle_box_used = False
+            circles = cv2.HoughCircles(
+                gray_roi,
+                cv2.HOUGH_GRADIENT,
+                dp=1.2,
+                minDist=20,
+                param1=50,
+                param2=15,
+                minRadius=5,
+                maxRadius=int(min(w, h) * 0.5)
+            )
+
+            if circles is not None:
+                # Use first detected circle
+                circles = np.round(circles[0, :]).astype("int")
+                cx_r, cy_r, r = circles[0]
+
+                # Convert ROI coords -> frame coords
+                cx = x + cx_r
+                cy = y + cy_r
+
+                # Draw circle
+                cv2.circle(frame2, (cx, cy), r, (0, 255, 255), 3)
+
+                # Draw new tight bounding box around circle
+                bx1 = cx - r
+                by1 = cy - r
+                bx2 = cx + r
+                by2 = cy + r
+                cv2.rectangle(frame2, (bx1, by1), (bx2, by2), (0, 255, 255), 2)
+
+                circle_box_used = True
+            else:
+                # --- fallback: original bbox ---
+                cx = x + w // 2
+                cy = y + h // 2
+
+                cv2.rectangle(frame2, (x, y), (x + w, y + h), (0, 0, 255), 3)
+
+            # Always draw displacement text
+            cv2.putText(frame2, f"{largest_disp:.1f}px",
+                        (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6, (0, 0, 255), 2)
+
             # Draw
             cv2.rectangle(frame2, (x, y), (x + w, y + h), (0, 0, 255), 3)
             cv2.putText(frame2, f"{largest_disp:.1f}px", (x, y - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
             # Store Y position ONLY for second half of video
+            # IMPORTANT: cx, cy ALREADY computed above (circle or fallback)
             if frame_no >= half_point:
-                cy = y + h // 2
-                cx = x + w // 2
+                if frame_no == 69:
+                    print(cx, positions[-1], positions[-2])
                 positions.append([frame_no, cy, cx])
-
 
         gray1 = gray2.copy()
         prev_centroids = curr_centroids.copy()
-
+        out.write(frame2)
 
     cap.release()
-
+    out.release()
 
     positions = np.array(positions)
 
@@ -98,8 +151,6 @@ def get_first_bounce_frame(inp):
         smooth_y = np.convolve(y_clean, np.ones(window) / window, mode='same')
 
 
-
-
         smooth_y = np.array(smooth_y)
         frame_nums_clean = np.array(frame_nums_clean)
 
@@ -109,7 +160,7 @@ def get_first_bounce_frame(inp):
         threshold = 0.90 * y_max  # 10% range
 
         candidate_peaks = []
-
+        smooth_y = y_clean
         for i in range(1, y_max_idx):  # only before the max
             if smooth_y[i] > smooth_y[i - 1] and smooth_y[i] > smooth_y[i + 1]:
                 if smooth_y[i] >= threshold:  # within 10% of max
@@ -124,7 +175,7 @@ def get_first_bounce_frame(inp):
         selected_y = float(smooth_y[selected_idx])
         selected_x = 0.5 * (x_vals[selected_idx + 1] + x_vals[selected_idx])
 
-
+        print(x_vals[selected_idx], x_vals[selected_idx + 1] )
         return selected_x, selected_y, selected_frame
 
     else:

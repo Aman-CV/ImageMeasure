@@ -141,7 +141,7 @@ def upload_calibration_video(request):
             singleton = SingletonHomographicMatrixModel.load()
             h, w = frame.shape[:2]
 
-            x1 = int(w * position_factor)
+            x1 = int(w * 0.15)
             x2 = int(w * (1 - position_factor))
             singleton.unit_distance = unit_distance
             singleton.end_pixel = max(x1, x2)
