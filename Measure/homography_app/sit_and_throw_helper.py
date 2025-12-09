@@ -1,13 +1,139 @@
 import numpy as np
 import cv2
 
+from scipy.signal import medfilt
+from scipy.ndimage import gaussian_filter1d
+
+def analyze_positions(positions):
+
+    positions = np.array(positions)
+    frame_numbers = positions[:, 0]
+    x_raw = positions[:, 1]
+    y_raw = positions[:, 2]
+
+    total_frames = frame_numbers[-1]
+    half_point = total_frames // 2
+
+
+    first_half_mask  = frame_numbers < half_point
+    second_half_mask = frame_numbers >= half_point
+
+    y_first  = y_raw[first_half_mask]
+    y_second = y_raw[second_half_mask].copy()
+    frames_second = frame_numbers[second_half_mask]
+    x_second = x_raw[second_half_mask]
+
+
+    mask_missing = (y_second == 0)
+    if np.any(~mask_missing):
+        y_second[mask_missing] = np.interp(
+            frames_second[mask_missing],
+            frames_second[~mask_missing],
+            y_second[~mask_missing]
+        )
+
+
+    y_second_med = medfilt(y_second, kernel_size=5)
+
+
+    y_second_smooth = gaussian_filter1d(y_second_med, sigma=2)
+
+
+    y_final = y_raw.copy()
+    y_final[second_half_mask] = y_second_smooth
+
+
+    peaks = []
+    y = y_second_smooth
+
+    for i in range(1, len(y) - 1):
+        if y[i] > y[i-1] and y[i] > y[i+1]:
+            peaks.append(i)
+
+    if len(peaks) == 0:
+        print("No peak detected in second half, using global max.")
+        peak_idx_local = np.argmax(y)
+    else:
+        peak_idx_local = peaks[0]  # first peak
+
+    peak_frame = frames_second[peak_idx_local]
+    peak_y = y_second_smooth[peak_idx_local]
+    peak_x = x_second[peak_idx_local]
+
+
+
+
+    return int(peak_frame), int(peak_x), float(peak_y)
+
+
+
+def get_first_bounce_frame_MOG(inp):
+    cap = cv2.VideoCapture(inp)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter("motion_output.mp4", fourcc, fps, (w, h))
+
+    fgbg = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
+
+    frame_no = 0
+    positions = []
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame_no += 1
+        frame = cv2.resize(frame, (1280, 720))
+        frame[:, :int(0.25 * frame.shape[1])] = 0
+
+        fgmask = fgbg.apply(frame)
+
+        _, thresh = cv2.threshold(fgmask, 200, 255, cv2.THRESH_BINARY)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        curr_pos = [frame_no, 0, 0]
+        if len(contours) > 0:
+
+            best = max(contours, key=lambda c: cv2.contourArea(c))
+
+            if cv2.contourArea(best) > 80:
+                x, y, w_box, h_box = cv2.boundingRect(best)
+
+                cx = x + w_box // 2
+                cy = y + h_box // 2
+
+                cv2.rectangle(frame, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
+                cv2.circle(frame, (cx, cy), 6, (0, 255, 255), -1)
+                cv2.putText(frame, f"Frame {frame_no}", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
+                curr_pos = [frame_no, cx, cy]
+
+        positions.append(curr_pos)
+        out.write(frame)
+
+
+    cap.release()
+    out.release()
+
+    print("Saved output video: motion_output.mp4")
+
+    positions = np.array(positions)
+
+    peak_frame, peak_x, peak_y = analyze_positions(positions)
+    return peak_x, peak_y, peak_frame
 
 def get_first_bounce_frame(inp):
     cap = cv2.VideoCapture(inp)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter("oo.mp4", fourcc, cap.get(cv2.CAP_PROP_FPS), (1280, 720))
 
-    # Get total frames to determine second half
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     half_point = total_frames // 2
 
@@ -16,7 +142,7 @@ def get_first_bounce_frame(inp):
     gray1 = cv2.GaussianBlur(gray1, (21, 21), 0)
 
     prev_centroids = []
-    positions = []  # Store [frame_no, y]
+    positions = []
 
     frame_no = 0
 
@@ -40,7 +166,6 @@ def get_first_bounce_frame(inp):
         curr_centroids = []
         displacements = []
 
-        # centroid + displacement
         for contour in contours:
             if cv2.contourArea(contour) < 200:
                 continue
@@ -63,12 +188,10 @@ def get_first_bounce_frame(inp):
             largest_disp, best_contour = max(displacements, key=lambda x: x[0])
             x, y, w, h = cv2.boundingRect(best_contour)
 
-            # --- Extract ROI for circle detection ---
             roi = frame2[y:y + h, x:x + w]
             gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
             gray_roi = cv2.GaussianBlur(gray_roi, (7, 7), 0)
 
-            # --- Try to detect a circle inside ROI ---
             circle_box_used = False
             circles = cv2.HoughCircles(
                 gray_roi,
@@ -82,18 +205,14 @@ def get_first_bounce_frame(inp):
             )
 
             if circles is not None:
-                # Use first detected circle
                 circles = np.round(circles[0, :]).astype("int")
                 cx_r, cy_r, r = circles[0]
 
-                # Convert ROI coords -> frame coords
                 cx = x + cx_r
                 cy = y + cy_r
 
-                # Draw circle
                 cv2.circle(frame2, (cx, cy), r, (0, 255, 255), 3)
 
-                # Draw new tight bounding box around circle
                 bx1 = cx - r
                 by1 = cy - r
                 bx2 = cx + r
@@ -102,24 +221,20 @@ def get_first_bounce_frame(inp):
 
                 circle_box_used = True
             else:
-                # --- fallback: original bbox ---
                 cx = x + w // 2
                 cy = y + h // 2
 
                 cv2.rectangle(frame2, (x, y), (x + w, y + h), (0, 0, 255), 3)
 
-            # Always draw displacement text
             cv2.putText(frame2, f"{largest_disp:.1f}px",
                         (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (0, 0, 255), 2)
 
-            # Draw
             cv2.rectangle(frame2, (x, y), (x + w, y + h), (0, 0, 255), 3)
             cv2.putText(frame2, f"{largest_disp:.1f}px", (x, y - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-            # Store Y position ONLY for second half of video
-            # IMPORTANT: cx, cy ALREADY computed above (circle or fallback)
+
             if frame_no >= half_point:
                 if frame_no == 69:
                     print(cx, positions[-1], positions[-2])
@@ -139,7 +254,6 @@ def get_first_bounce_frame(inp):
         frame_nums = positions[:, 0]
         y_vals = positions[:, 1]
         x_vals = positions[:, 2]
-        # ---- Outlier removal using standard deviation ----
         mean_y = np.mean(y_vals)
         std_y = np.std(y_vals)
 
@@ -157,13 +271,13 @@ def get_first_bounce_frame(inp):
         y_max = np.max(smooth_y)
         y_max_idx = np.argmax(smooth_y)
 
-        threshold = 0.90 * y_max  # 10% range
+        threshold = 0.90 * y_max
 
         candidate_peaks = []
         smooth_y = y_clean
-        for i in range(1, y_max_idx):  # only before the max
+        for i in range(1, y_max_idx):
             if smooth_y[i] > smooth_y[i - 1] and smooth_y[i] > smooth_y[i + 1]:
-                if smooth_y[i] >= threshold:  # within 10% of max
+                if smooth_y[i] >= threshold:
                     candidate_peaks.append(i)
 
         if len(candidate_peaks) == 0:

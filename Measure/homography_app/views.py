@@ -123,7 +123,8 @@ def upload_calibration_video(request):
             }, status=400)
         frame = cv2.resize(frame, (1280, 720))
         cv2.imwrite("cal_orig.jpg", frame)
-        frame = stretch_contrast(frame)
+        # if test_id == "vPbXoPK4":
+        #     frame = stretch_contrast(frame)
         cv2.imwrite("cal.jpg", frame)
         if test_id == "vPbXoPK4":
             mask, _, _  = detect_carpet_segment_p(frame)

@@ -17,7 +17,7 @@ from ultralytics import YOLO
 
 from .sit_and_reach_helper_ import detect_yellow_strip_positions_mask, find_three_centers_from_mask, \
     estimate_distance_between_points
-from .sit_and_throw_helper import get_first_bounce_frame
+from .sit_and_throw_helper import get_first_bounce_frame, get_first_bounce_frame_MOG
 
 logger = logging.getLogger('homography_app')
 
@@ -53,7 +53,7 @@ def process_sit_and_throw(petvideo_id, test_id=""):
             video_obj.progress = 0
 
 
-        cx, cy, cf = get_first_bounce_frame(video_path)
+        cx, cy, cf = get_first_bounce_frame_MOG(video_path)
         if cx is None or cy is None:
             logger.error(f"[process_sit_and_throw] Error in detecting ball: {petvideo_id}")
             video_obj.distance = 0
