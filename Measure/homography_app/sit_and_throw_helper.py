@@ -1,8 +1,10 @@
 import numpy as np
 import cv2
-
+from ultralytics import YOLO
 from scipy.signal import medfilt
 from scipy.ndimage import gaussian_filter1d
+
+
 
 def analyze_positions(positions):
 
@@ -46,18 +48,21 @@ def analyze_positions(positions):
     peaks = []
     y = y_second_smooth
 
+    prominence = 1
+
     for i in range(1, len(y) - 1):
-        if y[i] > y[i-1] and y[i] > y[i+1]:
-            peaks.append(i)
+        if (y[i] >= y[i - 1] and y[i] > y[i + 1]) or (y[i] > y[i - 1] and y[i] >= y[i + 1]):
+            if (y[i] - y[i - 1] >= prominence) or (y[i] - y[i + 1] >= prominence):
+                peaks.append(i)
 
     if len(peaks) == 0:
         print("No peak detected in second half, using global max.")
         peak_idx_local = np.argmax(y)
     else:
-        peak_idx_local = peaks[0]  # first peak
+        peak_idx_local = peaks[0]
 
     peak_frame = frames_second[peak_idx_local]
-    peak_y = y_second_smooth[peak_idx_local]
+    peak_y = y_second[peak_idx_local]
     peak_x = x_second[peak_idx_local]
 
 
@@ -76,17 +81,19 @@ def get_first_bounce_frame_MOG(inp):
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter("motion_output.mp4", fourcc, fps, (w, h))
 
-    fgbg = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
+    fgbg = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=200, detectShadows=True)
 
     frame_no = 0
     positions = []
+    model = YOLO("yolov8m.pt")  # pre-trained on COCO dataset
+    use_ai = True
     while True:
-        ret, frame = cap.read()
+        ret, frame0 = cap.read()
         if not ret:
             break
 
         frame_no += 1
-        frame = cv2.resize(frame, (1280, 720))
+        frame = cv2.resize(frame0, (1280, 720))
         frame[:, :int(0.25 * frame.shape[1])] = 0
 
         fgmask = fgbg.apply(frame)
@@ -99,24 +106,48 @@ def get_first_bounce_frame_MOG(inp):
 
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         curr_pos = [frame_no, 0, 0]
-        if len(contours) > 0:
+        if use_ai:
+            results = model.predict(frame, classes=[32], conf=0.2, verbose=False)  # sports ball only
+            detected = False
+            for r in results:
+                if r.boxes is not None and len(r.boxes) > 0:
+                    xyxy = r.boxes.xyxy.cpu().numpy().astype(int)
+                    x1, y1, x2, y2 = xyxy[0]  # take first detected ball
+                    cx = int((x1 + x2) / 2)
+                    cy = int((y1 + y2) / 2)
+                    cv2.rectangle(frame0, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.circle(frame0, (cx, cy), 6, (255, 0, 255), -1)
+                    cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
+                    curr_pos = [frame_no, cx, cy]
+                    detected = True
+                    break
 
+            if not detected:
+                curr_pos = [frame_no, 0, 0]
+
+        if not use_ai or (len(contours) > 0 and (curr_pos[1]==0 and curr_pos[2] == 0)):
+
+            # pick LARGEST moving object
             best = max(contours, key=lambda c: cv2.contourArea(c))
 
-            if cv2.contourArea(best) > 80:
+            if cv2.contourArea(best) > 80:  # reject very tiny blobs
                 x, y, w_box, h_box = cv2.boundingRect(best)
 
+                # centroid of motion blob
                 cx = x + w_box // 2
                 cy = y + h_box // 2
 
-                cv2.rectangle(frame, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
-                cv2.circle(frame, (cx, cy), 6, (0, 255, 255), -1)
-                cv2.putText(frame, f"Frame {frame_no}", (10, 30),
+                # draw box + dot
+                cv2.rectangle(frame0, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
+                cv2.circle(frame0, (cx, cy), 6, (0, 255, 255), -1)
+                cv2.putText(frame0, f"Using motion detector", (x, y-5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
+                cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
                 curr_pos = [frame_no, cx, cy]
-
         positions.append(curr_pos)
-        out.write(frame)
+        out.write(frame0)
 
 
     cap.release()
@@ -286,7 +317,7 @@ def get_first_bounce_frame(inp):
             selected_idx = candidate_peaks[0] - 1
 
         selected_frame = int(frame_nums_clean[selected_idx])
-        selected_y = float(smooth_y[selected_idx])
+        selected_y = float(y_vals[selected_idx])
         selected_x = 0.5 * (x_vals[selected_idx + 1] + x_vals[selected_idx])
 
         print(x_vals[selected_idx], x_vals[selected_idx + 1] )

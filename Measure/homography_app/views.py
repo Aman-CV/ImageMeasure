@@ -144,7 +144,7 @@ def upload_calibration_video(request):
 
             x1 = int(w * 0.15)
             x2 = int(w * (1 - position_factor))
-            singleton.unit_distance = unit_distance
+            singleton.unit_distance = 3.048
             singleton.end_pixel = max(x1, x2)
             singleton.start_pixel = min(x1, x2)
             cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)

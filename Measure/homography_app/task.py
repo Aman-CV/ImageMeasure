@@ -63,9 +63,28 @@ def process_sit_and_throw(petvideo_id, test_id=""):
             return
         print("s", cx, cy, cf)
         homograph_obj = SingletonHomographicMatrixModel.load()
-        video_obj.distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
+        distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
+        video_obj.distance = distance
         video_obj.is_video_processed = True
         video_obj.progress = 100
+        original_name = os.path.basename(video_obj.file.name)
+
+        final_output_path = os.path.join(output_dir, f"processed_{original_name}")
+
+        import subprocess
+        subprocess.run([
+            'ffmpeg', '-i', "motion_output.mp4",
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+            '-c:a', 'aac', '-movflags', '+faststart', '-y',
+            final_output_path
+        ], check=True)
+
+        with open(final_output_path, 'rb') as f:
+            video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
+        for path in [final_output_path]:
+            if os.path.exists(path):
+                os.remove(path)
+
         video_obj.save()
 
 
