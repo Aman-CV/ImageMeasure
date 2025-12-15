@@ -451,7 +451,7 @@ def list_videos_by_assessment_and_test(request):
         'participant_id': v.participant_id
     } for v in videos]
 
-    return JsonResponse({'videos': data})
+    return JsonResponse({'status':'true', 'message': 'success', 'data': data})
 
 
 

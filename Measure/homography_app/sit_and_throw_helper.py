@@ -45,21 +45,40 @@ def analyze_positions(positions):
     y_final[second_half_mask] = y_second_smooth
 
 
-    peaks = []
     y = y_second_smooth
+    peaks = []
 
-    prominence = 1
+    prominence = 1.0
+    window = 5
 
-    for i in range(1, len(y) - 1):
-        if (y[i] >= y[i - 1] and y[i] > y[i + 1]) or (y[i] > y[i - 1] and y[i] >= y[i + 1]):
-            if (y[i] - y[i - 1] >= prominence) or (y[i] - y[i + 1] >= prominence):
-                peaks.append(i)
+    for i in range(window, len(y) - window):
+
+        left = y[i - window:i]
+        right = y[i + 1:i + 1 + window]
+
+        if y[i] != np.max(y[i - window:i + window + 1]):
+            continue
+
+        baseline = max(np.min(left), np.min(right))
+
+        if y[i] - baseline >= prominence:
+            peaks.append(i)
 
     if len(peaks) == 0:
         print("No peak detected in second half, using global max.")
         peak_idx_local = np.argmax(y)
     else:
         peak_idx_local = peaks[0]
+
+    idx = peak_idx_local
+
+    start = max(idx - 2, 0)
+    end = min(idx + 3, len(y_second))
+
+    local_y = y_second[start:end]
+
+    offset = np.argmax(local_y)
+    peak_idx_local = start + offset
 
     peak_frame = frames_second[peak_idx_local]
     peak_y = y_second[peak_idx_local]
@@ -85,7 +104,7 @@ def get_first_bounce_frame_MOG(inp):
 
     frame_no = 0
     positions = []
-    model = YOLO("yolov8m.pt")  # pre-trained on COCO dataset
+    model = YOLO("yolov8x.pt")  # pre-trained on COCO dataset
     use_ai = True
     while True:
         ret, frame0 = cap.read()
@@ -128,20 +147,17 @@ def get_first_bounce_frame_MOG(inp):
 
         if not use_ai or (len(contours) > 0 and (curr_pos[1]==0 and curr_pos[2] == 0)):
 
-            # pick LARGEST moving object
             best = max(contours, key=lambda c: cv2.contourArea(c))
 
-            if cv2.contourArea(best) > 80:  # reject very tiny blobs
+            if cv2.contourArea(best) > 80:
                 x, y, w_box, h_box = cv2.boundingRect(best)
 
-                # centroid of motion blob
                 cx = x + w_box // 2
                 cy = y + h_box // 2
 
-                # draw box + dot
                 cv2.rectangle(frame0, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
                 cv2.circle(frame0, (cx, cy), 6, (0, 255, 255), -1)
-                cv2.putText(frame0, f"Using motion detector", (x, y-5),
+                cv2.putText(frame0, f"...", (x, y-3),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
                 cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
@@ -166,7 +182,7 @@ def get_first_bounce_frame(inp):
     out = cv2.VideoWriter("oo.mp4", fourcc, cap.get(cv2.CAP_PROP_FPS), (1280, 720))
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    half_point = total_frames // 2
+    half_point = total_frames // 4
 
     ret, frame1 = cap.read()
     gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
