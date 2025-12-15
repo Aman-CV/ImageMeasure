@@ -49,7 +49,7 @@ def upload_video(request):
                 'file': video,
                 'participant_name': participant_name,
                 'pet_type': pet_type,
-                'duration': duration,
+                'duration': round(duration / 1000, 3),
                 'progress': 0 if to_be_processed else 100,
                 'to_be_processed': to_be_processed,
             }
@@ -63,7 +63,7 @@ def upload_video(request):
             'name': obj.name,
             'participant_name': obj.participant_name,
             'pet_type': obj.pet_type,
-            'updated': not created  # True if it overwrote an existing record
+            'updated': not created
         })
 
     return JsonResponse({'status': 'error'}, status=400)

@@ -13,7 +13,7 @@ class PetVideos(models.Model):
     participant_id = models.CharField(max_length=64, default="dummy")
     file = models.FileField(upload_to='videos/')
     distance = models.FloatField(default=0)
-    duration = models.IntegerField(default=0)
+    duration = models.FloatField(default=0)
     pet_type = models.CharField(max_length=32, default="STANDING_JUMP")
     processed_file = models.FileField(upload_to='post_processed_video/', blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)

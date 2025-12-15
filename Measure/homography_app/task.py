@@ -347,7 +347,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         with open(final_output_path, 'rb') as f:
             video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
 
-        video_obj.distance = distance_ft
+        video_obj.distance = distance_ft / 3.281
         video_obj.is_video_processed = True
         video_obj.progress = 100
         video_obj.save()
