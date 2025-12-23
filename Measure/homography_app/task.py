@@ -296,18 +296,20 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         #sorted_points = sorted(trajectory, key=lambda p: p[1], reverse=True)
 
 
-        folder_path = "../media/homograph"  # <-- change this
-        files = glob.glob(os.path.join(folder_path, "homography_*.json"))
+        # folder_path = "../media/homograph"  # <-- change this
+        # files = glob.glob(os.path.join(folder_path, "homography_*.json"))
+        #
+        # if not files:
+        #     raise FileNotFoundError("No file found matching homography_*.json")
+        #
+        # latest_file = max(files, key=os.path.getmtime)
+        homograph_obj = SingletonHomographicMatrixModel.load()
 
-        if not files:
-            raise FileNotFoundError("No file found matching homography_*.json")
-
-        latest_file = max(files, key=os.path.getmtime)
+        latest_file = homograph_obj.matrix.path
         # Load JSON data
         with open(latest_file, "r") as f:
             H = np.array(json.load(f), dtype=np.float32)
         print(H)
-        homograph_obj = SingletonHomographicMatrixModel.load()
         if homograph_obj.start_pixel_broad_jump != 1:
             pt1[0] = homograph_obj.start_pixel_broad_jump
         distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
