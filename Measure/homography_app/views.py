@@ -112,7 +112,8 @@ def upload_calibration_video(request):
         middle_frame_index = total_frames // 2
         cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
         ret, frame = cap.read()
-        frame = correct_white_balance(frame)
+        if test_id == "vPbXoPK4":
+            frame = correct_white_balance(frame)
         cap.release()
         os.remove(temp_path)
 
@@ -165,7 +166,7 @@ def upload_calibration_video(request):
             v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
         else:
             h, s, v = DEFAULT_HSV
-        points = process_frame_for_color_centers(frame, selected_point=[640, 540], target_hsv=(h, s, v))
+            points = process_frame_for_color_centers(frame, selected_point=[540, 540], target_hsv=(h, s, v))
 
         points = merge_close_points(points, threshold=10)  # Your custom logic
         points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
@@ -209,7 +210,7 @@ def upload_calibration_video(request):
             save=False
         )
         homography_obj.unit_distance = unit_distance
-
+        homography_obj.start_pixel_broad_jump = order_points[0][0] #taking first pixel x corrd as start point
         for idx, (x, y) in enumerate(order_points):
             cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), -1)
             cv2.putText(

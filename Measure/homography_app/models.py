@@ -47,6 +47,7 @@ class SingletonHomographicMatrixModel(models.Model):
     tracker_hsv_value = models.JSONField(default=dict)
     start_pixel = models.IntegerField(default=0)
     end_pixel = models.IntegerField(default=1)
+    start_pixel_broad_jump = models.IntegerField(default = 1)
     class Meta:
         constraints = [
             CheckConstraint(

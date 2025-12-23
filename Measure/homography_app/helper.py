@@ -341,7 +341,7 @@ def filter_and_smooth(coords, window_size=5, threshold=5):
         local_median = np.median(coords[start:end], axis=0)
         distance = np.linalg.norm(coords[i] - local_median)
 
-        if distance > threshold:
+        if distance > threshold or (coords[i][1] == 720 and coords[i][0] == 1280):
             coords_filtered[i] = np.array([np.nan, np.nan])
     valid_mask = ~np.isnan(coords_filtered[:, 0])
     x_valid = np.where(valid_mask)[0]
@@ -678,3 +678,44 @@ def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110,
     centers = get_mask_centers(mask, return_largest=False)
 
     return centers
+
+
+def highest_peak_by_adjacent_minima(y, xvs, plot=False):
+
+    y = np.asarray(y)
+    x = np.arange(len(y))
+
+    peaks, _ = find_peaks(y)
+    if len(peaks) < 2:
+        return None, None, None, None, None
+
+    peak_idx = peaks[np.argmax(y[peaks])]
+
+    minima, _ = find_peaks(-y)
+    if len(minima) < 2:
+        return None, None, None, None, None
+    left_min = minima[minima < peak_idx]
+    start_idx = left_min[-1] if len(left_min) > 0 else 0
+
+    right_min = minima[minima > peak_idx]
+    end_idx = right_min[0] if len(right_min) > 0 else len(y) - 1
+
+    # ---- Plot ----
+    if plot:
+        pass
+        # plt.figure()
+        # plt.plot(x, y, label="Signal")
+        # plt.plot(x[peak_idx], y[peak_idx], "ro", label="Highest Peak")
+        # plt.plot(x[start_idx], y[start_idx], "go", label="Start (min)")
+        # plt.plot(x[end_idx], y[end_idx], "go", label="End (min)")
+        # plt.fill_between(
+        #     x[start_idx:end_idx + 1],
+        #     y[start_idx:end_idx + 1],
+        #     alpha=0.3,
+        #     label="Peak Region"
+        # )
+        # plt.legend()
+        # plt.title("Peak Boundaries via Adjacent Minima")
+        # plt.show()
+
+    return peak_idx, start_idx, end_idx, xvs[start_idx], xvs[end_idx]

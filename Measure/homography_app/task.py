@@ -10,7 +10,7 @@ import numpy as np
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
-    ankle_crop_color_detection, correct_white_balance
+    ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima
 import glob
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
@@ -229,7 +229,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
 
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            detected_points = [0, 0] if len(ankle_points) < 2 else list(ankle_points[-1])
+            detected_points = [1280, 720] if len(ankle_points) < 2 else list(ankle_points[-1])
             offset = 5 #pixel
             detected_points[-1] = offset + detected_points[-1]
             for cnt in contours:
@@ -263,6 +263,9 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         trajectory = filter_and_smooth(trajectory, threshold=10)
         np.save("trajectory.npy", trajectory)
         y_smooth = savgol_filter(trajectory[:, 1], window_length=11, polyorder=2)
+        y_ns = max(y_smooth) - y_smooth
+        p, st, end1, x1, x2 = highest_peak_by_adjacent_minima(y_ns, trajectory[:, 0])
+        print(p, st, end1, x1, st)
         dy = np.gradient(y_smooth)
         limit_cut = max(dy) / 10
         dy[np.logical_and(dy > -limit_cut, dy < limit_cut)] = 0
@@ -271,12 +274,18 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         if not success:
             logger.info(f"[process_video_task] Info processing PetVideo ID {petvideo_id}: flats not deteced")
         start, end = detect_biggest_jump(dy[f1[1]: f2[1]] if success else dy)
+
         if success and start and end and enable_start_end_detector:
-            end, start = end + f1[1], start + f1[1]
+            if st is None or end1 is None:
+                end, start = end + f1[1], start + f1[1]
+            else:
+                start, end = st, end1
+                print(start, end)
         else:
             start, end = 0, len(trajectory) - 1
         pt1 = trajectory[start if start else 0, :]
         pt2 = trajectory[end if end else len(trajectory) - 1, :]
+        print(pt1, pt2)
         pt1[0] -= 5
         pt2[0] -= 5
         y_offset = 10
@@ -298,6 +307,9 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         with open(latest_file, "r") as f:
             H = np.array(json.load(f), dtype=np.float32)
         print(H)
+        homograph_obj = SingletonHomographicMatrixModel.load()
+        if homograph_obj.start_pixel_broad_jump != 1:
+            pt1[0] = homograph_obj.start_pixel_broad_jump
         distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
         pt2[1] = pt1[1]
         img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
@@ -319,6 +331,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             frame = cv2.resize(frame, (1280, 720))
             if start <= traj_cnt <= end:
                 overlay = frame.copy()
+
                 overlay[:] = (0, 0, 160)  # BGR red
                 alpha = 0.3  # transparency factor
                 frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
@@ -360,3 +373,8 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
 
     except Exception as e:
         logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+
+
+@background(schedule=0, remove_existing_tasks=True)
+def process_broad_jump(petvideo_id):
+    pass
