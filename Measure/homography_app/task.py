@@ -296,7 +296,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         #sorted_points = sorted(trajectory, key=lambda p: p[1], reverse=True)
 
 
-        folder_path = "/Users/notcamelcase/PycharmProjects/ImageMeasure/Measure/media/homograph"  # <-- change this
+        folder_path = "../media/homograph"  # <-- change this
         files = glob.glob(os.path.join(folder_path, "homography_*.json"))
 
         if not files:
