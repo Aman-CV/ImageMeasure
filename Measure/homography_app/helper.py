@@ -507,8 +507,8 @@ def detect_carpet_segment(frame, selected_point=None):
     # --- compute tolerance-based range safely ---
     lower_hsv = np.array([
         max(10, 0),
-        max(center[1] - TOL_S, 0),
-        max(center[2] - TOL_V, 0)
+        max(0, 0),
+        max(0, 0)
     ], dtype=np.uint8)
 
     upper_hsv = np.array([
@@ -525,6 +525,8 @@ def detect_carpet_segment(frame, selected_point=None):
     #     179, 255, 80
     # ], dtype=np.uint8)
     # --- Mask for target color ---
+    print(lower_hsv)
+    print(upper_hsv)
     mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
 
     # --- Ignore white/desaturated areas ---
