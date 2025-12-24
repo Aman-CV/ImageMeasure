@@ -199,7 +199,7 @@ def upload_calibration_video(request):
             ], dtype=np.float32)
 
         order_points = np.array(order_points_anticlockwise(points))
-
+        print(order_points, world_pts)
         H, _ = cv2.findHomography(order_points, world_pts)
         homography_matrix = H.tolist()
 
