@@ -166,7 +166,9 @@ def upload_calibration_video(request):
             v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
         else:
             h, s, v = DEFAULT_HSV
-        points = process_frame_for_color_centers(frame, selected_point=[540, 540], target_hsv=(h, s, v))
+        selected_point = [1280 * 0.422, 720 * 0.75]
+        print(selected_point)
+        points = process_frame_for_color_centers(frame, selected_point=selected_point, target_hsv=(h, s, v))
 
         points = merge_close_points(points, threshold=10)  # Your custom logic
         points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
