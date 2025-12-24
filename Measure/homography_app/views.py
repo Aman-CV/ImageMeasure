@@ -166,7 +166,7 @@ def upload_calibration_video(request):
             v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
         else:
             h, s, v = DEFAULT_HSV
-        selected_point = [1280 * 0.422, 720 * 0.75]
+        selected_point = [int(1280 * 0.422), int(720 * 0.75)]
         print(selected_point)
         points = process_frame_for_color_centers(frame, selected_point=selected_point, target_hsv=(h, s, v))
 
