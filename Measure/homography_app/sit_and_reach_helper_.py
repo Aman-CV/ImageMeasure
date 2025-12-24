@@ -58,10 +58,10 @@ def detect_yellow_strip_positions_mask(frame, mask, hz, margin_ratio=0.02, max_h
 
     yellow_mask_full = np.zeros((h, w), dtype=np.uint8)
     yellow_mask_full[y_top:y_bottom, :] = yellow_mask
-    cv2.imwrite("this_strip.jpg", yellow_mask_full)
+    cv2.imwrite("media/this_strip.jpg", yellow_mask_full)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     yellow_mask_full = cv2.morphologyEx(yellow_mask_full, cv2.MORPH_OPEN, kernel)
-    cv2.imwrite("this_strip_morph.jpg", yellow_mask_full)
+    cv2.imwrite("media/this_strip_morph.jpg", yellow_mask_full)
 
     return yellow_mask_full
 
