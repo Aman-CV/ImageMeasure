@@ -497,7 +497,7 @@ def detect_carpet_segment(frame, selected_point=None):
         DEFAULT_HSV = np.array([80, 80, 40], dtype=np.uint8)
     else:
         x, y = selected_point
-        DEFAULT_HSV = hsv[y, x]
+        DEFAULT_HSV = hsv[y - 360, x]
         print("h")
     print(DEFAULT_HSV)
     TOL_H, TOL_S, TOL_V = 10, 50, 50
