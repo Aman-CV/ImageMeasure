@@ -169,8 +169,9 @@ def upload_calibration_video(request):
         selected_point = [int(1280 * 0.422), int(720 * 0.75)]
         print(selected_point)
         points = process_frame_for_color_centers(frame, selected_point=selected_point, target_hsv=(h, s, v))
-
-        points = merge_close_points(points, threshold=10)  # Your custom logic
+        print(points)
+        points = merge_close_points(points, threshold=10)
+        print(points)
         points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
         if len(points) < 4:
             return JsonResponse({
