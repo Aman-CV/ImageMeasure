@@ -681,6 +681,9 @@ def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110,
         return []
 
     mask, separated = separate_color_by_hsv(segmented_region, target_hsv=target_hsv)
+    cv2.imwrite("media/temp1.jpg", separated)
+    cv2.imwrite("media/temp2.jpg", mask)
+
 
     centers = get_mask_centers(mask, return_largest=False)
 
