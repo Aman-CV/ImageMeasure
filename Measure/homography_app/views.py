@@ -123,10 +123,10 @@ def upload_calibration_video(request):
                 'message': 'Could not extract frame from video'
             }, status=400)
         frame = cv2.resize(frame, (1280, 720))
-        cv2.imwrite("cal_orig.jpg", frame)
+        cv2.imwrite("media/cal_orig.jpg", frame)
         # if test_id == "vPbXoPK4":
         #     frame = stretch_contrast(frame)
-        cv2.imwrite("cal.jpg", frame)
+        cv2.imwrite("media/cal.jpg", frame)
         if test_id == "vPbXoPK4":
             mask, _, _  = detect_carpet_segment_p(frame)
             singleton = SingletonHomographicMatrixModel.load()
@@ -175,7 +175,7 @@ def upload_calibration_video(request):
                 'status': 'error',
                 'message': f'Failed to detect exactly 4 points. Detected: {len(points)}'
             }, status=400)
-        cv2.imwrite("tihis.jpg", frame)
+        cv2.imwrite("media/tihis.jpg", frame)
         if len(points) < 6:
             points = points_sorted[:4]
             world_pts = np.array([
@@ -283,7 +283,7 @@ def upload_calibration_video_deprecated(request):
                 'message': 'Could not extract frame from video'
             }, status=400)
         frame = cv2.resize(frame, (1280, 720))
-        cv2.imwrite("cal.jpg", frame)
+        cv2.imwrite("media/cal.jpg", frame)
         # HSV mask logic (assume DEFAULT_HSV, TOL_H, TOL_S, TOL_V are defined)
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         singleton = SingletonHomographicMatrixModel.load()
@@ -314,7 +314,7 @@ def upload_calibration_video_deprecated(request):
                 'status': 'error',
                 'message': f'Failed to detect exactly 4 points. Detected: {len(points)}'
             }, status=400)
-        cv2.imwrite("tihis.jpg", frame)
+        cv2.imwrite("media/tihis.jpg", frame)
         if len(points) < 6:
             points = points_sorted[:4]
             world_pts = np.array([
@@ -401,7 +401,7 @@ def process_image(request):
         if img is None:
             return JsonResponse({'error': 'Invalid image'}, status=400)
         print(img.shape)
-        cv2.imwrite("ths.jpg", img)
+        cv2.imwrite("media/ths.jpg", img)
         hsv_frame = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         h, s, v = hsv_frame[y, x]
         h, s, v = int(h), int(s), int(v)
@@ -412,7 +412,7 @@ def process_image(request):
         output_img = img.copy()
         output_img[mask > 0] = highlight[mask > 0]
         cv2.circle(output_img, (x, y), 4, (25, 48, 228), -1)
-        cv2.imwrite("this.jpg", output_img)
+        cv2.imwrite("media/this.jpg", output_img)
         _, buffer = cv2.imencode('.jpg', output_img)
         encoded_image = base64.b64encode(buffer).decode('utf-8')
 

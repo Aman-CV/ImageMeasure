@@ -668,7 +668,7 @@ def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110,
 
 
     segment_mask, segmented_region = detect_carpet_segment(frame, selected_point=selected_point)
-    cv2.imwrite("temp.jpg", segmented_region)
+    cv2.imwrite("media/temp.jpg", segmented_region)
     if segmented_region is None or np.count_nonzero(segment_mask) == 0:
         print("No carpet region detected.")
         return []
