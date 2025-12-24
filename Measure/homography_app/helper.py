@@ -500,15 +500,15 @@ def detect_carpet_segment(frame, selected_point=None):
         DEFAULT_HSV = hsv[y - 360, x]
         print("h")
     print(DEFAULT_HSV)
-    TOL_H, TOL_S, TOL_V = 10, 50, 50
+    TOL_H, TOL_S, TOL_V = 15, 50, 50
 
     center = DEFAULT_HSV.astype(int)
 
     # --- compute tolerance-based range safely ---
     lower_hsv = np.array([
-        max(10, 0),
-        max(0, 0),
-        max(0, 0)
+        max(center[0] - TOL_H, 179),
+        max(center[1] - TOL_S, 255),
+        max(center[2] - TOL_V, 255)
     ], dtype=np.uint8)
 
     upper_hsv = np.array([
