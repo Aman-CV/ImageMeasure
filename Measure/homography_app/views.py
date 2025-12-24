@@ -49,7 +49,7 @@ def upload_video(request):
                 'file': video,
                 'participant_name': participant_name,
                 'pet_type': pet_type,
-                'duration': round(duration / 1000, 3),
+                'duration': round(0 / 1000, 3),
                 'progress': 0 if to_be_processed else 100,
                 'to_be_processed': to_be_processed,
             }
@@ -145,7 +145,7 @@ def upload_calibration_video(request):
 
             x1 = int(w * 0.15)
             x2 = int(w * (1 - position_factor))
-            singleton.unit_distance = 3.048
+            singleton.unit_distance = 2.5908
             singleton.end_pixel = max(x1, x2)
             singleton.start_pixel = min(x1, x2)
             cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)
@@ -166,7 +166,7 @@ def upload_calibration_video(request):
             v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
         else:
             h, s, v = DEFAULT_HSV
-            points = process_frame_for_color_centers(frame, selected_point=[540, 540], target_hsv=(h, s, v))
+        points = process_frame_for_color_centers(frame, selected_point=[540, 540], target_hsv=(h, s, v))
 
         points = merge_close_points(points, threshold=10)  # Your custom logic
         points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
