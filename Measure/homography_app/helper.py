@@ -490,14 +490,14 @@ def detect_and_measure_image(image_path, output_path, homography):
 def detect_carpet_segment(frame, selected_point=None):
 
     h, w, _ = frame.shape
-    lower_half = frame[h // 2:, :]
+    lower_half = frame[:, :]
     print(selected_point)
     hsv = cv2.cvtColor(lower_half, cv2.COLOR_BGR2HSV)
     if not selected_point:
         DEFAULT_HSV = np.array([80, 80, 40], dtype=np.uint8)
     else:
         x, y = selected_point
-        DEFAULT_HSV = hsv[y - 360, x]
+        DEFAULT_HSV = hsv[y, x]
         print("h")
     print(DEFAULT_HSV)
     TOL_H, TOL_S, TOL_V = 15, 50, 50
@@ -531,7 +531,7 @@ def detect_carpet_segment(frame, selected_point=None):
 
     # --- Ignore white/desaturated areas ---
     s_channel = hsv[:, :, 1]
-    mask[s_channel < 40] = 0
+    #mask[s_channel < 40] = 0
 
     # --- Clean mask carefully ---
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
