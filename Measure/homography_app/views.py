@@ -151,7 +151,7 @@ def upload_calibration_video(request):
             cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)
             cv2.line(frame, (x2, 0), (x2, h), (0, 0, 255), 2)
             _, buffer = cv2.imencode('.jpg', frame)
-            singleton.mask.save(
+            singleton.file.save(
                 'frame.jpg',
                 ContentFile(buffer.tobytes()),
                 save=True
