@@ -506,7 +506,7 @@ def detect_carpet_segment(frame, selected_point=None):
 
     # --- compute tolerance-based range safely ---
     lower_hsv = np.array([
-        max(center[0] - TOL_H, 0),
+        max(10, 0),
         max(center[1] - TOL_S, 0),
         max(center[2] - TOL_V, 0)
     ], dtype=np.uint8)
