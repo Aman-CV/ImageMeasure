@@ -226,8 +226,7 @@ def upload_calibration_video(request):
                 1
             )
         _, buffer = cv2.imencode('.jpg', frame)
-        if homography_obj.file:
-            homography_obj.file.delete(save=False)
+
         homography_obj.file.save(
             'mask.jpg',
             ContentFile(buffer.tobytes()),
