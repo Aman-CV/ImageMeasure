@@ -9,7 +9,7 @@ def estimate_distance_between_points(centers, known_distance_cm=15):
     if len(centers) < 3:
         return None
 
-    P3, P2, P1 = centers
+    P1, P2, P3 = centers
 
     # pixel distances
     d12_pix = math.hypot(P1[0]-P2[0], P1[1]-P2[1])
