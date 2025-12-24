@@ -615,7 +615,7 @@ def separate_color_by_hsv(
     # target color
     target_color = np.uint8([[target_hsv]])
     target_bgr = cv2.cvtColor(target_color, cv2.COLOR_HSV2BGR)[0, 0]
-    target_bgr = np.array([0, 240, 240], dtype = np.uint8)
+    target_bgr = np.array([0, 200, 200], dtype = np.uint8)
     # two dark tones
     dark_gray = np.array([50, 50, 50], dtype=np.uint8)
     black = np.array([0, 0, 0], dtype=np.uint8)
