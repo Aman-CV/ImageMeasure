@@ -20,7 +20,7 @@ def estimate_distance_between_points(centers, known_distance_cm=15):
 
     scale = known_distance_cm / d12_pix
     est_d23_cm = d23_pix * scale
-
+    print(est_d23_cm)
     return est_d23_cm
 
 def detect_yellow_strip_positions_mask(frame, mask, hz, margin_ratio=0.02, max_hits=3):
