@@ -498,6 +498,7 @@ def detect_carpet_segment(frame, selected_point=None):
     else:
         x, y = selected_point
         DEFAULT_HSV = hsv[y, x]
+    print(DEFAULT_HSV)
     TOL_H, TOL_S, TOL_V = 10, 50, 50
 
     center = DEFAULT_HSV.astype(int)
