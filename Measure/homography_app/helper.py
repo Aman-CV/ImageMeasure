@@ -615,12 +615,14 @@ def separate_color_by_hsv(
     # target color
     target_color = np.uint8([[target_hsv]])
     target_bgr = cv2.cvtColor(target_color, cv2.COLOR_HSV2BGR)[0, 0]
-    target_bgr = np.array([0, 200, 200], dtype = np.uint8)
+    target_bgr = np.array([0, 230, 230], dtype = np.uint8)
+    target_bgr2 = np.array([30, 150, 200], dtype = np.uint8)
+
     # two dark tones
     dark_gray = np.array([50, 50, 50], dtype=np.uint8)
     black = np.array([0, 0, 0], dtype=np.uint8)
 
-    palette = np.array([target_bgr, dark_gray, black], dtype=np.uint8)
+    palette = np.array([target_bgr, target_bgr2, dark_gray, black], dtype=np.uint8)
 
     img = segmented_region.reshape((-1, 3)).astype(np.float32)
 
@@ -628,7 +630,7 @@ def separate_color_by_hsv(
     labels = np.argmin(distances, axis=1)
 
     target_cluster = 0  # index 0 = target color
-    mask = np.where(labels == target_cluster, 255, 0).astype(np.uint8)
+    mask = np.where((labels == target_cluster) | (labels == 1), 255, 0).astype(np.uint8)
     mask = mask.reshape(segmented_region.shape[:2])
 
         # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
