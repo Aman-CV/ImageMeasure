@@ -139,13 +139,13 @@ def upload_calibration_video(request):
             return JsonResponse({
                 'status': 'success',
             })
-        if test_id == "BwbJyXKl":
+        if test_id == "BwbJyXKl" or test_id == "G6bWk0bW":
             singleton = SingletonHomographicMatrixModel.load()
             h, w = frame.shape[:2]
 
             x1 = int(w * 0.15)
             x2 = int(w * (1 - position_factor))
-            singleton.unit_distance = 2.5908
+            singleton.unit_distance = unit_distance
             singleton.end_pixel = max(x1, x2)
             singleton.start_pixel = min(x1, x2)
             cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)
@@ -153,6 +153,11 @@ def upload_calibration_video(request):
             _, buffer = cv2.imencode('.jpg', frame)
             singleton.file.save(
                 'frame.jpg',
+                ContentFile(buffer.tobytes()),
+                save=True
+            )
+            singleton.mask.save(
+                'mask.jpg',
                 ContentFile(buffer.tobytes()),
                 save=True
             )
@@ -228,6 +233,11 @@ def upload_calibration_video(request):
         _, buffer = cv2.imencode('.jpg', frame)
 
         homography_obj.file.save(
+            'mask.jpg',
+            ContentFile(buffer.tobytes()),
+            save=False
+        )
+        homography_obj.mask.save(
             'mask.jpg',
             ContentFile(buffer.tobytes()),
             save=True

@@ -303,28 +303,28 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         #     raise FileNotFoundError("No file found matching homography_*.json")
         #
         # latest_file = max(files, key=os.path.getmtime)
+
         homograph_obj = SingletonHomographicMatrixModel.load()
 
-        latest_file = homograph_obj.matrix.path
-        # Load JSON data
-        with open(latest_file, "r") as f:
-            H = np.array(json.load(f), dtype=np.float32)
-        print(H)
-        if homograph_obj.start_pixel_broad_jump != 1:
-            pt1[0] = homograph_obj.start_pixel_broad_jump
-        distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
+
+        # if homograph_obj.start_pixel_broad_jump != 1:
+        #     pt1[0] = homograph_obj.start_pixel_broad_jump
+        # distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
+        distance_ft = round(homograph_obj.unit_distance * abs(pt2[0] - homograph_obj.start_pixel) / abs(
+            homograph_obj.start_pixel - homograph_obj.end_pixel), 2)
         pt2[1] = pt1[1]
-        img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
-        world_line = cv2.perspectiveTransform(img_line, H)[0]
-        p1, p2 = world_line
-        vec = p2 - p1
-        length = np.linalg.norm(vec)
-        unit_vec = vec / length if length != 0 else 1
-        num_marks = int(length)  # one marker per foot
-        scale_world = np.array([p1 + i * unit_vec for i in range(num_marks + 1)], dtype=np.float32).reshape(-1, 1, 2)
-        H_inv = np.linalg.inv(H)
-        scale_img = cv2.perspectiveTransform(scale_world, H_inv)
-        scale_img = scale_img[:, 0, :].astype(int)
+        # img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
+        # world_line = cv2.perspectiveTransform(img_line, H)[0]
+        # p1, p2 = world_line
+        # vec = p2 - p1
+
+        # length = np.linalg.norm(vec)
+        # unit_vec = vec / length if length != 0 else 1
+        # num_marks = int(length)  # one marker per foot
+        # scale_world = np.array([p1 + i * unit_vec for i in range(num_marks + 1)], dtype=np.float32).reshape(-1, 1, 2)
+        # H_inv = np.linalg.inv(H)
+        # scale_img = cv2.perspectiveTransform(scale_world, H_inv)
+        # scale_img = scale_img[:, 0, :].astype(int)
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -341,11 +341,11 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             traj_cnt += 1
             cv2.line(frame, trajectory[start], trajectory[end], (0, 0, 0), 2)
 
-            for i, (x, y) in enumerate(scale_img):
-                if 0 <= x < width and 0 <= y < height:
-                    cv2.circle(frame, (x, y), 4, (0, 255, 0), -1)
-                    cv2.putText(frame, f"{i}ft", (x + 6, y - 6),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+            # for i, (x, y) in enumerate(scale_img):
+            #     if 0 <= x < width and 0 <= y < height:
+            #         cv2.circle(frame, (x, y), 4, (0, 255, 0), -1)
+            #         cv2.putText(frame, f"{i}ft", (x + 6, y - 6),
+            #                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
             frame = cv2.resize(frame, (width, height))
             out.write(frame )
         cap.release()
