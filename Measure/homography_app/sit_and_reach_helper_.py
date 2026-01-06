@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
-
+import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 
 def estimate_distance_between_points(centers, known_distance_cm=15):
 
@@ -161,3 +163,88 @@ def detect_carpet_segment_p(frame, p=0.75):
     return segment_mask, segmented_region, segmented_region2
 
 
+
+
+
+def middle_finger_movement_distance(video_path, show=False, debug=True):
+
+    base_options = python.BaseOptions(
+        model_asset_path="/Users/notcamelcase/PycharmProjects/ImageMeasure/Measure/homography_app/hand_landmarker.task"
+    )
+
+    options = vision.HandLandmarkerOptions(
+        base_options=base_options,
+        num_hands=1,
+        min_hand_detection_confidence=0.5,
+        min_hand_presence_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
+
+    detector = vision.HandLandmarker.create_from_options(options)
+
+    cap = cv2.VideoCapture(video_path)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    out = cv2.VideoWriter("temp_output_path.mp4", fourcc, fps, (width, height))
+    initial_point = None
+    final_point = None
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        h, w, _ = frame.shape
+
+        mp_image = mp.Image(
+            image_format=mp.ImageFormat.SRGB,
+            data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        )
+
+        result = detector.detect(mp_image)
+
+        if result.hand_landmarks:
+            hand_landmarks = result.hand_landmarks[0]
+
+            middle_tip = hand_landmarks[12]
+            cx = int(middle_tip.x * w)
+            cy = int(middle_tip.y * h)
+
+            if initial_point is None:
+                initial_point = (cx, cy)
+
+            final_point = (cx, cy)
+
+            if show or debug:
+                cv2.circle(frame, (cx, cy), 10, (0, 0, 255), -1)
+                cv2.putText(
+                    frame,
+                    f"({cx},{cy})",
+                    (cx + 10, cy - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 255),
+                    1
+                )
+                out.write(frame)
+
+        if show:
+            cv2.imshow("Middle Finger Tracking", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
+    if initial_point is None or final_point is None:
+        return None
+
+    distance = np.sqrt(
+        (final_point[0] - initial_point[0]) ** 2 +
+        (final_point[1] - initial_point[1]) ** 2
+    )
+
+    return distance

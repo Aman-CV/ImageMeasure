@@ -12,7 +12,7 @@ from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_
     process_frame_for_color_centers, correct_white_balance, stretch_contrast
 from .models import PetVideos, SingletonHomographicMatrixModel
 from .sit_and_reach_helper_ import detect_carpet_segment_p
-from .task import process_video_task, process_sit_and_throw
+from .task import process_video_task, process_sit_and_throw, process_sit_and_reach
 from django.conf import settings
 import base64
 
@@ -56,6 +56,9 @@ def upload_video(request):
         )
         if test_id == "BwbJyXKl":
             process_sit_and_throw(obj.id, test_id)
+        elif test_id == "vPbXoPK4":
+            print("I was here")
+            process_sit_and_reach(obj.id, test_id)
         else:
             process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id)
         return JsonResponse({

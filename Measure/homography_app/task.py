@@ -16,7 +16,7 @@ from scipy.signal import savgol_filter
 from ultralytics import YOLO
 
 from .sit_and_reach_helper_ import detect_yellow_strip_positions_mask, find_three_centers_from_mask, \
-    estimate_distance_between_points
+    estimate_distance_between_points, middle_finger_movement_distance
 from .sit_and_throw_helper import get_first_bounce_frame, get_first_bounce_frame_MOG
 
 logger = logging.getLogger('homography_app')
@@ -92,6 +92,52 @@ def process_sit_and_throw(petvideo_id, test_id=""):
 
     except Exception as e:
         logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+
+
+@background(schedule=0, remove_existing_tasks=True)
+def process_sit_and_reach(petvideo_id, test_id=""):
+    if len(test_id) == 0:
+        logger.info(f"[process_video_task] INVALID TEST ID: {petvideo_id}")
+        return
+    if test_id == "vPbXoPK4":
+        logger.info(f"[process_video_task] Starting processing for PetVideo ID (Sit and reach variant): {petvideo_id}")
+        try:
+            video_obj = PetVideos.objects.get(id=petvideo_id)
+        except PetVideos.DoesNotExist:
+            logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+            return
+        video_path = video_obj.file.path
+        if video_obj.processed_file:
+            video_obj.processed_file.delete(save=False)
+            video_obj.processed_file = None
+
+
+        try:
+            video_obj.is_video_processed = False
+            video_obj.progress = 0
+            homograph_obj = SingletonHomographicMatrixModel.load()
+
+            distance = middle_finger_movement_distance(video_obj.file.path)
+
+            with open(video_obj.file.path, 'rb') as f:
+                video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=False)
+
+            if not distance:
+                logger.info(f"[process_video_task] Finger tip detection failed: {petvideo_id}")
+            else:
+                print(distance)
+            video_obj.distance = round(distance if distance else 0, 2)
+            video_obj.is_video_processed = True
+            video_obj.progress = 100
+            video_obj.save()
+
+
+
+            logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
+
+        except Exception as e:
+            logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+        return
 
 
 @background(schedule=0, remove_existing_tasks=True)
