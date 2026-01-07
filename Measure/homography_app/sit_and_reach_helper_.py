@@ -174,7 +174,7 @@ def middle_finger_movement_distance(video_path, show=False, debug=True):
 
     options = vision.HandLandmarkerOptions(
         base_options=base_options,
-        num_hands=1,
+        num_hands=2,
         min_hand_detection_confidence=0.5,
         min_hand_presence_confidence=0.5,
         min_tracking_confidence=0.5
@@ -206,9 +206,12 @@ def middle_finger_movement_distance(video_path, show=False, debug=True):
         result = detector.detect(mp_image)
 
         if result.hand_landmarks:
-            hand_landmarks = result.hand_landmarks[0]
+            rightmost_hand = max(
+                result.hand_landmarks,
+                key=lambda hand: hand[12].x  # middle finger tip x
+            )
 
-            middle_tip = hand_landmarks[12]
+            middle_tip = rightmost_hand[12]
             cx = int(middle_tip.x * w)
             cy = int(middle_tip.y * h)
 

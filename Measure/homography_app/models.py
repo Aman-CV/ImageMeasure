@@ -35,6 +35,12 @@ def delete_files_on_model_delete(sender, instance, **kwargs):
 
 
 
+class CalibrationDataModel(models.Model):
+    assessment_id = models.CharField(max_length=64, default="dummy")
+    test_id = models.CharField(max_length=64, default="jump")
+    start_pixel = models.IntegerField(default=0)
+    end_pixel = models.IntegerField(default=1)
+    unit_distance = models.FloatField(default=2.5908)
 
 
 class SingletonHomographicMatrixModel(models.Model):

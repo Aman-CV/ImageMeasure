@@ -7,7 +7,7 @@ import cv2
 import json
 import numpy as np
 
-from .models import PetVideos, SingletonHomographicMatrixModel
+from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
     ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima
@@ -23,9 +23,9 @@ logger = logging.getLogger('homography_app')
 
 
 @background(schedule=0, remove_existing_tasks=True)
-def process_sit_and_throw(petvideo_id, test_id=""):
-    if test_id == "":
-        logger.info(f"[process_video_task] INVALID TEST ID: {petvideo_id}")
+def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
+    if test_id == "" or assessment_id == "":
+        logger.info(f"[process_video_task] INVALID TEST/ASSESSMENT ID: {petvideo_id}")
         return
     logger.info(f"[process_video_task] Starting processing for PetVideo ID: {petvideo_id}")
     try:
@@ -62,7 +62,12 @@ def process_sit_and_throw(petvideo_id, test_id=""):
             video_obj.save()
             return
         print("s", cx, cy, cf)
-        homograph_obj = SingletonHomographicMatrixModel.load()
+        homograph_obj = CalibrationDataModel.objects.filter(
+            assessment_id=assessment_id,
+            test_id=test_id
+        ).first()
+        if not homograph_obj:
+            homograph_obj = SingletonHomographicMatrixModel.load()
         distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
         video_obj.distance = distance
         video_obj.is_video_processed = True
@@ -95,11 +100,11 @@ def process_sit_and_throw(petvideo_id, test_id=""):
 
 
 @background(schedule=0, remove_existing_tasks=True)
-def process_sit_and_reach(petvideo_id, test_id=""):
-    if len(test_id) == 0:
-        logger.info(f"[process_video_task] INVALID TEST ID: {petvideo_id}")
+def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
+    if len(test_id) == 0 or len(assessment_id) == 0:
+        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
         return
-    if test_id == "vPbXoPK4":
+    if test_id == "vPbXoPK4" or test_id == "reach":
         logger.info(f"[process_video_task] Starting processing for PetVideo ID (Sit and reach variant): {petvideo_id}")
         try:
             video_obj = PetVideos.objects.get(id=petvideo_id)
@@ -115,10 +120,18 @@ def process_sit_and_reach(petvideo_id, test_id=""):
         try:
             video_obj.is_video_processed = False
             video_obj.progress = 0
-            homograph_obj = SingletonHomographicMatrixModel.load()
+            homograph_obj = CalibrationDataModel.objects.filter(
+                assessment_id=assessment_id,
+                test_id=test_id
+            ).first()
+            if not homograph_obj:
+                homograph_obj = SingletonHomographicMatrixModel.load()
 
             distance = middle_finger_movement_distance(video_obj.file.path)
-
+            if not distance:
+                distance = 0
+            print(distance)
+            distance = distance * homograph_obj.unit_distance / abs(homograph_obj.start_pixel - homograph_obj.end_pixel)
             with open(video_obj.file.path, 'rb') as f:
                 video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=False)
 
@@ -141,11 +154,11 @@ def process_sit_and_reach(petvideo_id, test_id=""):
 
 
 @background(schedule=0, remove_existing_tasks=True)
-def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id=""):
-    if test_id == "":
-        logger.info(f"[process_video_task] INVALID TEST ID: {petvideo_id}")
+def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id=""):
+    if test_id == "" or assessment_id == "":
+        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
         return
-    if test_id == "vPbXoPK4":
+    if test_id == "notvalid":
         logger.info(f"[process_video_task] Starting processing for PetVideo ID (Sit and reach variant): {petvideo_id}")
         try:
             video_obj = PetVideos.objects.get(id=petvideo_id)
@@ -350,7 +363,12 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         #
         # latest_file = max(files, key=os.path.getmtime)
 
-        homograph_obj = SingletonHomographicMatrixModel.load()
+        homograph_obj = CalibrationDataModel.objects.filter(
+            assessment_id=assessment_id,
+            test_id=test_id
+        ).first()
+        if not homograph_obj:
+            homograph_obj = SingletonHomographicMatrixModel.load()
 
 
         # if homograph_obj.start_pixel_broad_jump != 1:
