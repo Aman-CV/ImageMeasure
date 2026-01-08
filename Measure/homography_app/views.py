@@ -10,7 +10,7 @@ from sklearn.utils import deprecated
 import tempfile
 from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_points_anticlockwise, \
     process_frame_for_color_centers, correct_white_balance, stretch_contrast
-from .models import PetVideos, SingletonHomographicMatrixModel
+from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .sit_and_reach_helper_ import detect_carpet_segment_p
 from .task import process_video_task, process_sit_and_throw, process_sit_and_reach
 from django.conf import settings
@@ -49,18 +49,18 @@ def upload_video(request):
                 'file': video,
                 'participant_name': participant_name,
                 'pet_type': pet_type,
-                'duration': round(0 / 1000, 3),
+                'duration': round(duration / 1000, 3),
                 'progress': 0 if to_be_processed else 100,
                 'to_be_processed': to_be_processed,
             }
         )
         if test_id == "BwbJyXKl":
-            process_sit_and_throw(obj.id, test_id)
+            process_sit_and_throw(obj.id, test_id=test_id, assessment_id =assessment_id)
         elif test_id == "vPbXoPK4":
             print("I was here")
-            process_sit_and_reach(obj.id, test_id)
+            process_sit_and_reach(obj.id, test_id=test_id, assessment_id=assessment_id)
         else:
-            process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id)
+            process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id)
         return JsonResponse({
             'status': 'success',
             'name': obj.name,
@@ -79,9 +79,9 @@ def upload_calibration_video(request):
     if request.method == 'POST' and request.FILES.get('video'):
         video_file = request.FILES['video']
         test_id = request.POST.get('test_id', "not_sit_and_reach")
-        unit_distance = float(request.POST.get('square_size', 0.984252))
+        unit_distance = float(request.POST.get('square_size', 2.5908))
         position_factor = float(request.POST.get('position_factor', 1.5))
-
+        assessment_id = request.POST.get('assessment_id', 'notvalid')
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp:
             for chunk in video_file.chunks():
                 temp.write(chunk)
@@ -130,7 +130,7 @@ def upload_calibration_video(request):
         # if test_id == "vPbXoPK4":
         #     frame = stretch_contrast(frame)
         cv2.imwrite("media/cal.jpg", frame)
-        if test_id == "vPbXoPK4":
+        if test_id == "notvalid":
             mask, _, _  = detect_carpet_segment_p(frame)
             singleton = SingletonHomographicMatrixModel.load()
             _, buffer = cv2.imencode('.jpg', mask)
@@ -142,7 +142,7 @@ def upload_calibration_video(request):
             return JsonResponse({
                 'status': 'success',
             })
-        if test_id == "BwbJyXKl" or test_id == "G6bWk0bW":
+        if test_id == "BwbJyXKl" or test_id == "G6bWk0bW" or test_id == "vPbXoPK4":
             singleton = SingletonHomographicMatrixModel.load()
             h, w = frame.shape[:2]
 
@@ -163,6 +163,15 @@ def upload_calibration_video(request):
                 'mask.jpg',
                 ContentFile(buffer.tobytes()),
                 save=True
+            )
+            obj, created = CalibrationDataModel.objects.update_or_create(
+                test_id=test_id,
+                assessment_id=assessment_id,
+                defaults={
+                  'start_pixel' : min(x1, x2),
+                    'end_pixel' : max(x1, x2),
+                    'unit_distance' : unit_distance
+                }
             )
             return JsonResponse({
                 'status': 'success',
