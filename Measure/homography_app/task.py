@@ -47,10 +47,8 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     output_dir = os.path.join(settings.MEDIA_ROOT, 'post_processed_video')
     os.makedirs(output_dir, exist_ok=True)
     try:
-        with open(video_obj.file.path, 'rb') as f:
-            video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
-            video_obj.is_video_processed = False
-            video_obj.progress = 0
+        video_obj.is_video_processed = False
+        video_obj.progress = 0
 
 
         cx, cy, cf = get_first_bounce_frame_MOG(video_path)
@@ -74,7 +72,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         video_obj.progress = 100
         original_name = os.path.basename(video_obj.file.name)
 
-        final_output_path = os.path.join(output_dir, f"processed_{original_name}")
+        final_output_path = f"temp_media_store/processed_{original_name}"
 
         import subprocess
         subprocess.run([
@@ -260,7 +258,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
-    output_dir = os.path.join(settings.MEDIA_ROOT, 'post_processed_video')
+    output_dir = "temp_media_store"
     os.makedirs(output_dir, exist_ok=True)
 
     temp_output_path = os.path.join(output_dir, f"temp_{original_name}")
@@ -411,7 +409,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             #         cv2.putText(frame, f"{i}ft", (x + 6, y - 6),
             #                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
             frame = cv2.resize(frame, (width, height))
-            out.write(frame )
+            out.write(frame)
         cap.release()
         out.release()
         # --- ffmpeg encode ---
