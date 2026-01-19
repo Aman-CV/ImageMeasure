@@ -44,7 +44,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
-    output_dir = os.path.join(settings.MEDIA_ROOT, 'post_processed_video')
+    output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
     os.makedirs(output_dir, exist_ok=True)
     try:
         video_obj.is_video_processed = False
@@ -168,7 +168,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         if video_obj.processed_file:
             video_obj.processed_file.delete(save=False)
             video_obj.processed_file = None
-        output_dir = os.path.join(settings.MEDIA_ROOT, 'post_processed_video')
+        output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
         os.makedirs(output_dir, exist_ok=True)
 
         temp_output_path = os.path.join(output_dir, f"temp_{original_name}")
