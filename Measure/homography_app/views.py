@@ -489,7 +489,7 @@ def list_videos(request):
 
 
 def video_stream(request, filename):
-    file_path = os.path.join(settings.MEDIA_ROOT, 'post_processed_video', filename)
+    file_path = os.path.join(settings.TEMP_STORAGE, 'post_processed_video', filename)
     if not os.path.exists(file_path):
         return JsonResponse({"status": "error", "message": "Video not found"}, status=404)
 
