@@ -2,20 +2,32 @@
 
 from django.db.models import CheckConstraint, Q
 import os
+import uuid
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+
+
+def processed_file_name(instance, old_filename):
+    extension = os.path.splitext(old_filename)[1]
+    filename = str(uuid.uuid4()) + extension
+    return 'post_processed_video/' + filename
+
+def file_name(instance, old_filename):
+    extension = os.path.splitext(old_filename)[1]
+    filename = str(uuid.uuid4()) + extension
+    return 'videos/' + filename
 
 class PetVideos(models.Model):
     name = models.CharField(max_length=255)
     is_video_processed = models.BooleanField(default=False)
     participant_name = models.CharField(max_length=255, default="NoName")
     participant_id = models.CharField(max_length=64, default="dummy")
-    file = models.FileField(upload_to='videos/')
+    file = models.FileField(upload_to=file_name)
     distance = models.FloatField(default=0)
     duration = models.FloatField(default=0)
     pet_type = models.CharField(max_length=32, default="STANDING_JUMP")
-    processed_file = models.FileField(upload_to='post_processed_video/', blank=True, null=True)
+    processed_file = models.FileField(upload_to=processed_file_name, blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     progress = models.PositiveSmallIntegerField(default=0)
     to_be_processed = models.BooleanField(default=False)

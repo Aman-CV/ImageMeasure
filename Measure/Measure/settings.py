@@ -124,7 +124,7 @@ AWS_QUERYSTRING_AUTH = False  # Public URLs
 
 AWS_S3_FILE_OVERWRITE = False
 
-AWS_DEFAULT_ACL = None
+# AWS_DEFAULT_ACL = None
 
 AWS_S3_OBJECT_PARAMETERS = {
      'CacheControl': 'max-age=86400',
