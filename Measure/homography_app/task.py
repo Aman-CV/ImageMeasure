@@ -40,7 +40,11 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    video_path = video_obj.file.path
+    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+    video_path  = os.path.join(
+                    settings.TEMP_VIDEO_STORAGE,
+                    f"videot_{petvideo_id}{ext}"
+                    )
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
@@ -83,11 +87,18 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         ], check=True)
 
         with open(final_output_path, 'rb') as f:
-            video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
+            video_obj.processed_file.save(original_name, File(f), save=False)
         for path in [final_output_path]:
             if os.path.exists(path):
                 os.remove(path)
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+        file_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{petvideo_id}{ext}"
+        )
 
+        if os.path.exists(file_path):
+            os.remove(file_path)
         video_obj.save()
 
 
@@ -109,7 +120,12 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
         except PetVideos.DoesNotExist:
             logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
             return
-        video_path = video_obj.file.path
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+
+        video_path  = os.path.join(
+                    settings.TEMP_VIDEO_STORAGE,
+                    f"videot_{petvideo_id}{ext}"
+                    )
         if video_obj.processed_file:
             video_obj.processed_file.delete(save=False)
             video_obj.processed_file = None
@@ -125,12 +141,12 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             if not homograph_obj:
                 homograph_obj = SingletonHomographicMatrixModel.load()
 
-            distance = middle_finger_movement_distance(video_obj.file.path)
+            distance = middle_finger_movement_distance(video_path)
             if not distance:
                 distance = 0
             print(distance)
             distance = distance * homograph_obj.unit_distance / abs(homograph_obj.start_pixel - homograph_obj.end_pixel)
-            with open(video_obj.file.path, 'rb') as f:
+            with open(video_path, 'rb') as f:
                 video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=False)
 
             if not distance:
@@ -141,7 +157,14 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.save()
+            ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+            file_path = os.path.join(
+                settings.TEMP_VIDEO_STORAGE,
+                f"videot_{petvideo_id}{ext}"
+            )
 
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
 
             logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
@@ -247,13 +270,30 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
         return
     if not video_obj.to_be_processed:
-        with open(video_obj.file.path, 'rb') as f:
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+        video_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{petvideo_id}{ext}"
+        )
+        with open(video_path, 'rb') as f:
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+        file_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{petvideo_id}{ext}"
+        )
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
         logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
         return
-    video_path = video_obj.file.path
+    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+    video_path = os.path.join(
+        settings.TEMP_VIDEO_STORAGE,
+        f"videot_{petvideo_id}{ext}"  # use the correct extension
+    )
     original_name = os.path.basename(video_obj.file.name)
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
@@ -422,13 +462,20 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         ], check=True)
 
         with open(final_output_path, 'rb') as f:
-            video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
+            video_obj.processed_file.save(original_name, File(f), save=False)
 
         video_obj.distance = distance_ft / 3.281
         video_obj.is_video_processed = True
         video_obj.progress = 100
         video_obj.save()
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+        file_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{petvideo_id}{ext}"
+        )
 
+        if os.path.exists(file_path):
+            os.remove(file_path)
         for path in [temp_output_path, final_output_path]:
             if os.path.exists(path):
                 os.remove(path)

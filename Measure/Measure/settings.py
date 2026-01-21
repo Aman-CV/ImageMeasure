@@ -95,7 +95,6 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -112,6 +111,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 TEMP_STORAGE = os.path.join(BASE_DIR, 'media')
+TEMP_VIDEO_STORAGE = os.path.join(BASE_DIR, 'temp_media_store')
 # AWS
 
 
