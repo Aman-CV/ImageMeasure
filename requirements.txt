@@ -6,3 +6,4 @@ scikit-learn==1.7.2
 scipy==1.16.2
 ultralytics==8.3.221
 mediapipe~=0.10.31
+django-storages~=1.14.6

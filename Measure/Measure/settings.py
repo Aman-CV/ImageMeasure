@@ -23,6 +23,16 @@ load_dotenv()
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'django-insecure-b@e$fsp%f+07n7j$a1upca^sz^-7!1)v2@^@eresjb!ys%=o5z'
 SECRET_KEY = os.getenv("SECRET_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_CLOUDFRONT_DOMAIN = os.getenv("AWS_CLOUDFRONT_DOMAIN")
+# AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
+AWS_S3_CUSTOM_DOMAIN = AWS_CLOUDFRONT_DOMAIN
+AWS_DEFAULT_ACL = os.getenv("AWS_DEFAULT_ACL")
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_QUERYSTRING_AUTH = True
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -38,7 +48,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'homography_app',
-    'background_task'
+    'background_task',
+    'storages'
 ]
 
 MIDDLEWARE = [
@@ -84,7 +95,6 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -100,9 +110,37 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+TEMP_STORAGE = os.path.join(BASE_DIR, 'media')
+TEMP_VIDEO_STORAGE = os.path.join(BASE_DIR, 'temp_media_store')
+# AWS
 
+
+AWS_ACCESS_KEY_ID = AWS_ACCESS_KEY
+MEDIAFILES_LOCATION = 'media'
+#MEDIA_URL = '%s/%s/' % (AWS_CLOUDFRONT_DOMAIN, MEDIAFILES_LOCATION)
+#MEDIA_URL = f'{AWS_CLOUDFRONT_DOMAIN}/{MEDIAFILES_LOCATION}/'
+AWS_LOCATION = 'media'
+AWS_QUERYSTRING_AUTH = False  # Public URLs
+
+AWS_S3_FILE_OVERWRITE = False
+
+# AWS_DEFAULT_ACL = None
+
+AWS_S3_OBJECT_PARAMETERS = {
+     'CacheControl': 'max-age=86400',
+}
+AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_CLOUDFRONT_DOMAIN")
+
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/

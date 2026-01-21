@@ -1,6 +1,9 @@
 import json
 import os
+
+from botocore.exceptions import ClientError
 from django.http import JsonResponse, FileResponse
+from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 import cv2
@@ -40,6 +43,11 @@ def upload_video(request):
         enable_color_marker_tracking = request.POST.get('enable_color_marker_tracking', 'true').lower()
         enable_start_end_detector = enable_start_end_detector in ('true', '1', 'yes', 'on')
         enable_color_marker_tracking = enable_color_marker_tracking in ('true', '1', 'yes', 'on')
+
+        os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
+
+
+
         obj, created = PetVideos.objects.update_or_create(
             participant_id=participant_id,
             test_id=test_id,
@@ -54,6 +62,16 @@ def upload_video(request):
                 'to_be_processed': to_be_processed,
             }
         )
+        ext = os.path.splitext(video.name)[1]
+        file_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{obj.id}{ext}"
+        )
+        print(f"Debug: videot_{obj.id}{ext}")
+        with open(file_path, 'wb') as destination:
+            for chunk in video.chunks():
+                destination.write(chunk)
+
         if test_id == "BwbJyXKl":
             process_sit_and_throw(obj.id, test_id=test_id, assessment_id =assessment_id)
         elif test_id == "vPbXoPK4":
@@ -488,33 +506,106 @@ def list_videos(request):
     return JsonResponse({'videos': data})
 
 
-def video_stream(request, filename):
-    file_path = os.path.join(settings.MEDIA_ROOT, 'post_processed_video', filename)
-    if not os.path.exists(file_path):
-        return JsonResponse({"status": "error", "message": "Video not found"}, status=404)
+def video_stream(request, video_id):
+    try:
+        video = get_object_or_404(PetVideos, id=video_id)
 
-    return FileResponse(open(file_path, 'rb'), content_type='video/mp4')
+        if not video.processed_file:
+            return JsonResponse(
+                {"status": "error", "message": "Processed video not available"},
+                status=404
+            )
 
+        file_obj = video.processed_file.open('rb')
+
+        return FileResponse(
+            file_obj,
+            content_type='video/mp4'
+        )
+
+    except PetVideos.DoesNotExist:
+        return JsonResponse(
+            {"status": "error", "message": "Video not found"},
+            status=404
+        )
+
+    except ClientError as e:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": "Failed to access video storage",
+                "detail": str(e)
+            },
+            status=500
+        )
+
+    except Exception as e:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": "Unexpected error while streaming video"
+            },
+            status=500
+        )
+
+# def video_stream(request, filename):
+#     file_path = os.path.join(settings.TEMP_STORAGE, 'post_processed_video', filename)
+#     if not os.path.exists(file_path):
+#         return JsonResponse({"status": "error", "message": "Video not found"}, status=404)
+#
+#     return FileResponse(open(file_path, 'rb'), content_type='video/mp4')
 
 def get_video_detail(request):
     video_id = request.GET.get('id')
     if not video_id:
-        return JsonResponse({'status': 'error', 'message': 'No video ID provided'}, status=400)
+        return JsonResponse(
+            {'status': 'error', 'message': 'No video ID provided'},
+            status=400
+        )
 
     try:
         video = PetVideos.objects.get(id=video_id)
-        if not video.processed_file:
-            return JsonResponse({'status': 'error', 'message': 'Processed video not available'}, status=404)
 
-        filename = os.path.basename(video.processed_file.name)
-        video_url = request.build_absolute_uri(f'/stream_video/{filename}/')
+        if not video.processed_file:
+            return JsonResponse(
+                {'status': 'error', 'message': 'Processed video not available'},
+                status=404
+            )
+
+        video_url = request.build_absolute_uri(
+            f'/stream_video/{video.id}/'
+        )
 
         return JsonResponse({
             'status': 'success',
             'processed_video_url': video_url
         })
+
     except PetVideos.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Video not found'}, status=404)
+        return JsonResponse(
+            {'status': 'error', 'message': 'Video not found'},
+            status=404
+        )
+
+# def get_video_detail(request):
+#     video_id = request.GET.get('id')
+#     if not video_id:
+#         return JsonResponse({'status': 'error', 'message': 'No video ID provided'}, status=400)
+#
+#     try:
+#         video = PetVideos.objects.get(id=video_id)
+#         if not video.processed_file:
+#             return JsonResponse({'status': 'error', 'message': 'Processed video not available'}, status=404)
+#
+#         filename = os.path.basename(video.processed_file.name)
+#         video_url = request.build_absolute_uri(f'/stream_video/{filename}/')
+#
+#         return JsonResponse({
+#             'status': 'success',
+#             'processed_video_url': video_url
+#         })
+#     except PetVideos.DoesNotExist:
+#         return JsonResponse({'status': 'error', 'message': 'Video not found'}, status=404)
 
 
 def get_homograph(request):
