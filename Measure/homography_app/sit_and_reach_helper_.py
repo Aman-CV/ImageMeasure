@@ -3,6 +3,7 @@ import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+from pathlib import Path
 
 def estimate_distance_between_points(centers, known_distance_cm=15):
 
@@ -167,9 +168,10 @@ def detect_carpet_segment_p(frame, p=0.75):
 
 
 def middle_finger_movement_distance(video_path, show=False, debug=True):
-
+    current_dir = Path(__file__).parent
+    task_path = current_dir / "hand_landmarker.task"
     base_options = python.BaseOptions(
-        model_asset_path="/Users/notcamelcase/PycharmProjects/ImageMeasure/Measure/homography_app/hand_landmarker.task"
+        model_asset_path=str(task_path)
     )
 
     options = vision.HandLandmarkerOptions(
