@@ -16,7 +16,7 @@ load_dotenv()
 
 TOKEN = os.getenv("VIDEO_UPLOAD_TOKEN")
 
-def test_video_url(assessment_id, test_id, participant_id, url):
+def test_video_url(assessment_id, test_id, participant_id, vurl):
     # domain = "http://127.0.0.1:8000"
     domain = "http://ec2-13-126-18-144.ap-south-1.compute.amazonaws.com"
     url = f"{domain}/api/coaching/assessment/member/video_upload/"
@@ -28,7 +28,7 @@ def test_video_url(assessment_id, test_id, participant_id, url):
                 "assessment_id": assessment_id,
                 "member_id":  participant_id,
                 "variant_id": test_id,
-                "video_url": url
+                "video_url": vurl
             }
         ]
     }
