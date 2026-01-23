@@ -37,13 +37,21 @@ class PetVideos(models.Model):
     def __str__(self):
         return self.name
 
+
 @receiver(post_delete, sender=PetVideos)
 def delete_files_on_model_delete(sender, instance, **kwargs):
     for field in ['file', 'processed_file']:
         file_field = getattr(instance, field)
-        if file_field and file_field.name:
-            if os.path.isfile(file_field.path):
-                os.remove(file_field.path)
+        if file_field:
+            file_field.delete(save=False)
+
+# @receiver(post_delete, sender=PetVideos)
+# def delete_files_on_model_delete(sender, instance, **kwargs):
+#     for field in ['file', 'processed_file']:
+#         file_field = getattr(instance, field)
+#         if file_field and file_field.name:
+#             if os.path.isfile(file_field.path):
+#                 os.remove(file_field.path)
 
 
 
