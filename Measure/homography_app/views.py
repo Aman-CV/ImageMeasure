@@ -1,6 +1,6 @@
 import json
 import os
-
+import subprocess
 from botocore.exceptions import ClientError
 from django.http import JsonResponse, FileResponse
 from django.shortcuts import get_object_or_404
@@ -62,15 +62,54 @@ def upload_video(request):
                 'to_be_processed': to_be_processed,
             }
         )
-        ext = os.path.splitext(video.name)[1]
-        file_path = os.path.join(
+        # always save raw upload first
+        ext = os.path.splitext(video.name)[1].lower()
+        raw_path = os.path.join(
             settings.TEMP_VIDEO_STORAGE,
-            f"videot_{obj.id}{ext}"
+            f"videot_{obj.id}_raw{ext}"
         )
-        print(f"Debug: videot_{obj.id}{ext}")
-        with open(file_path, 'wb') as destination:
+
+        print(f"Debug: saving raw video → {raw_path}")
+
+        with open(raw_path, "wb") as destination:
             for chunk in video.chunks():
                 destination.write(chunk)
+            destination.flush()  # IMPORTANT
+            os.fsync(destination.fileno())  # CRITICAL
+
+        print("Raw video size:", os.path.getsize(raw_path))
+        final_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{obj.id}.mp4"
+        )
+
+        try:
+            subprocess.run([
+                'ffmpeg', '-i', raw_path,
+                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+                '-c:a', 'aac', '-movflags', '+faststart', '-y',
+                final_path
+            ], check=True)
+
+
+            # ---- delete raw file ONLY if encode succeeded ----
+            if os.path.exists(raw_path):
+                os.remove(raw_path)
+                print("Deleted raw upload:", raw_path)
+
+        except subprocess.CalledProcessError as e:
+            print("FFmpeg failed. Keeping raw file for debugging.")
+            raise e
+
+        # ext = os.path.splitext(video.name)[1]
+        # file_path = os.path.join(
+        #     settings.TEMP_VIDEO_STORAGE,
+        #     f"videot_{obj.id}{ext}"
+        # )
+        # print(f"Debug: videot_{obj.id}{ext}")
+        # with open(file_path, 'wb') as destination:
+        #     for chunk in video.chunks():
+        #         destination.write(chunk)
 
         if test_id == "BwbJyXKl":
             process_sit_and_throw(obj.id, test_id=test_id, assessment_id =assessment_id)

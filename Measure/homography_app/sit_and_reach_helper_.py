@@ -233,7 +233,7 @@ def middle_finger_movement_distance(video_path, show=False, debug=True):
                     (0, 0, 255),
                     1
                 )
-                out.write(frame)
+        out.write(frame)
 
         if show:
             cv2.imshow("Middle Finger Tracking", frame)
