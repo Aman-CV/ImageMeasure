@@ -10,7 +10,7 @@ import numpy as np
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
-    ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima
+    ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima, test_video_url
 import glob
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
@@ -101,7 +101,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
             os.remove(file_path)
         video_obj.save()
 
-
+        test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
         logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
     except Exception as e:
@@ -166,7 +166,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             if os.path.exists(file_path):
                 os.remove(file_path)
 
-
+            test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
             logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
         except Exception as e:
@@ -286,7 +286,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         )
         if os.path.exists(file_path):
             os.remove(file_path)
-
+        test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
         logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
         return
     ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
@@ -479,7 +479,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         for path in [temp_output_path, final_output_path]:
             if os.path.exists(path):
                 os.remove(path)
-
+        test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
         logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
     except Exception as e:

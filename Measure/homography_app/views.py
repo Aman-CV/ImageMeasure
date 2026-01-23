@@ -62,7 +62,6 @@ def upload_video(request):
                 'to_be_processed': to_be_processed,
             }
         )
-        # always save raw upload first
         ext = os.path.splitext(video.name)[1].lower()
         raw_path = os.path.join(
             settings.TEMP_VIDEO_STORAGE,
@@ -74,8 +73,8 @@ def upload_video(request):
         with open(raw_path, "wb") as destination:
             for chunk in video.chunks():
                 destination.write(chunk)
-            destination.flush()  # IMPORTANT
-            os.fsync(destination.fileno())  # CRITICAL
+            destination.flush()
+            os.fsync(destination.fileno())
 
         print("Raw video size:", os.path.getsize(raw_path))
         final_path = os.path.join(
@@ -92,7 +91,6 @@ def upload_video(request):
             ], check=True)
 
 
-            # ---- delete raw file ONLY if encode succeeded ----
             if os.path.exists(raw_path):
                 os.remove(raw_path)
                 print("Deleted raw upload:", raw_path)
