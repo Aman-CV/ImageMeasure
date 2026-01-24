@@ -146,8 +146,26 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 distance = 0
             print(distance)
             distance = distance * homograph_obj.unit_distance / abs(homograph_obj.start_pixel - homograph_obj.end_pixel)
-            with open(video_path, 'rb') as f:
-                video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=False)
+            #----#
+            original_name = os.path.basename(video_obj.file.name)
+            final_output_path = f"temp_media_store/processed_{original_name}"
+
+            import subprocess
+            subprocess.run([
+                'ffmpeg', '-i', "temp_output_path.mp4",
+                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+                '-c:a', 'aac', '-movflags', '+faststart', '-y',
+                final_output_path
+            ], check=True)
+
+            with open(final_output_path, 'rb') as f:
+                video_obj.processed_file.save(original_name, File(f), save=False)
+            for path in [final_output_path]:
+                if os.path.exists(path):
+                    os.remove(path)
+            #----#
+            #with open(video_path, 'rb') as f:
+            #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=False)
 
             if not distance:
                 logger.info(f"[process_video_task] Finger tip detection failed: {petvideo_id}")
