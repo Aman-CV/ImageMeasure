@@ -768,3 +768,5 @@ def highest_peak_by_adjacent_minima(y, xvs, plot=False):
         # plt.show()
 
     return peak_idx, start_idx, end_idx, xvs[start_idx], xvs[end_idx]
+
+

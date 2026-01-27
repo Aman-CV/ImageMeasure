@@ -37,6 +37,38 @@ class PetVideos(models.Model):
     def __str__(self):
         return self.name
 
+    def run_processing(self):
+        """
+        Decides which processing function to call
+        based on test_id.
+        """
+
+        from .task import (
+            process_sit_and_reach,
+            process_sit_and_throw,
+            process_video_task,
+        )
+
+        if self.test_id in ("vPbXoPK4", "reach"):
+            return process_sit_and_reach(
+                self.id,
+                test_id=self.test_id,
+                assessment_id=self.assessment_id,
+            )
+
+        elif self.test_id in ("BwbJyXKl", "throw"):
+            return process_sit_and_throw(
+                self.id,
+                test_id=self.test_id,
+                assessment_id=self.assessment_id,
+            )
+
+        return process_video_task(
+            self.id,
+            test_id=self.test_id,
+            assessment_id=self.assessment_id,
+        )
+
 
 @receiver(post_delete, sender=PetVideos)
 def delete_files_on_model_delete(sender, instance, **kwargs):
@@ -61,6 +93,9 @@ class CalibrationDataModel(models.Model):
     start_pixel = models.IntegerField(default=0)
     end_pixel = models.IntegerField(default=1)
     unit_distance = models.FloatField(default=2.5908)
+
+    def __str__(self):
+        return self.test_id
 
 
 class SingletonHomographicMatrixModel(models.Model):

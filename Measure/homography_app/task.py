@@ -21,6 +21,59 @@ from .sit_and_throw_helper import get_first_bounce_frame, get_first_bounce_frame
 
 logger = logging.getLogger('homography_app')
 
+import os
+from django.conf import settings
+
+
+import os
+import subprocess
+from django.conf import settings
+
+
+def download_and_save_video(obj):
+    video = obj.file
+
+    os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
+
+    ext = os.path.splitext(video.name)[1] or ".mp4"
+
+    raw_path = os.path.join(
+        settings.TEMP_VIDEO_STORAGE,
+        f"raw_{obj.id}{ext}"
+    )
+
+    with video.open("rb") as src, open(raw_path, "wb") as destination:
+        for chunk in src.chunks():
+            destination.write(chunk)
+        destination.flush()
+        os.fsync(destination.fileno())
+
+    print("Raw video size:", os.path.getsize(raw_path))
+
+    final_path = os.path.join(
+        settings.TEMP_VIDEO_STORAGE,
+        f"videot_{obj.id}.mp4"
+    )
+
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-i", raw_path,
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "23",
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            "-y",
+            final_path,
+        ],
+        check=True,
+    )
+    if os.path.exists(raw_path):
+        os.remove(raw_path)
+        print("Deleted raw upload:", raw_path)
+
+
 
 @background(schedule=0, remove_existing_tasks=True)
 def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
@@ -45,6 +98,8 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
                     settings.TEMP_VIDEO_STORAGE,
                     f"videot_{petvideo_id}{ext}"
                     )
+    if not os.path.exists(video_path):
+        download_and_save_video(video_obj)
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
@@ -78,7 +133,6 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
 
         final_output_path = f"temp_media_store/processed_{original_name}"
 
-        import subprocess
         subprocess.run([
             'ffmpeg', '-i', "motion_output.mp4",
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
@@ -126,6 +180,8 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                     settings.TEMP_VIDEO_STORAGE,
                     f"videot_{petvideo_id}{ext}"
                     )
+        if not os.path.exists(video_path):
+            download_and_save_video(video_obj)
         if video_obj.processed_file:
             video_obj.processed_file.delete(save=False)
             video_obj.processed_file = None
@@ -150,7 +206,6 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
 
-            import subprocess
             subprocess.run([
                 'ffmpeg', '-i', "temp_output_path.mp4",
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
@@ -250,7 +305,6 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 out.write(frame)
             cap.release()
             out.release()
-            import subprocess
             subprocess.run([
                 'ffmpeg', '-i', temp_output_path,
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
@@ -293,6 +347,8 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             settings.TEMP_VIDEO_STORAGE,
             f"videot_{petvideo_id}{ext}"
         )
+        if not os.path.exists(video_path):
+            download_and_save_video(video_obj)
         with open(video_path, 'rb') as f:
             video_obj.is_video_processed = True
             video_obj.progress = 100
@@ -310,8 +366,10 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
     ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
     video_path = os.path.join(
         settings.TEMP_VIDEO_STORAGE,
-        f"videot_{petvideo_id}{ext}"  # use the correct extension
+        f"videot_{petvideo_id}{ext}"
     )
+    if not os.path.exists(video_path):
+        download_and_save_video(video_obj)
     original_name = os.path.basename(video_obj.file.name)
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
@@ -424,9 +482,11 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             test_id=test_id
         ).first()
         if not homograph_obj:
+            print("Calibration was not successful")
             homograph_obj = SingletonHomographicMatrixModel.load()
 
 
+        print(homograph_obj.start_pixel, homograph_obj.end_pixel, pt2[0])
         # if homograph_obj.start_pixel_broad_jump != 1:
         #     pt1[0] = homograph_obj.start_pixel_broad_jump
         # distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
@@ -471,7 +531,6 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         cap.release()
         out.release()
         # --- ffmpeg encode ---
-        import subprocess
         subprocess.run([
             'ffmpeg', '-i', temp_output_path,
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
@@ -482,7 +541,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         with open(final_output_path, 'rb') as f:
             video_obj.processed_file.save(original_name, File(f), save=False)
 
-        video_obj.distance = distance_ft / 3.281
+        video_obj.distance = distance_ft
         video_obj.is_video_processed = True
         video_obj.progress = 100
         video_obj.save()
