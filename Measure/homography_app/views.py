@@ -135,7 +135,8 @@ def upload_calibration_video(request):
         video_file = request.FILES['video']
         test_id = request.POST.get('test_id', "not_sit_and_reach")
         unit_distance = float(request.POST.get('square_size', 2.5908))
-        position_factor = float(request.POST.get('position_factor', 1.5))
+        position_factor = float(request.POST.get('position_factor', 0.5))
+        position_factor2 = float(request.POST.get('position_factor2', 0.15))
         assessment_id = request.POST.get('assessment_id', 'notvalid')
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp:
             for chunk in video_file.chunks():
@@ -201,8 +202,9 @@ def upload_calibration_video(request):
             singleton = SingletonHomographicMatrixModel.load()
             h, w = frame.shape[:2]
 
-            x1 = int(w * 0.15)
-            x2 = int(w * (1 - position_factor))
+            x1 = int(w * position_factor2)
+            x2 = int(w * position_factor)
+            print(x1, position_factor, x2, position_factor2, "This is calib")
             singleton.unit_distance = unit_distance
             singleton.end_pixel = max(x1, x2)
             singleton.start_pixel = min(x1, x2)
