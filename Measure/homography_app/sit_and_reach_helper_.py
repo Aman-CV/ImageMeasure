@@ -252,4 +252,4 @@ def middle_finger_movement_distance(video_path, show=False, debug=True):
         (final_point[1] - initial_point[1]) ** 2
     )
 
-    return distance
+    return distance, initial_point, final_point

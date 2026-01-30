@@ -6,11 +6,13 @@ from django.core.files import File
 import cv2
 import json
 import numpy as np
+from sympy.codegen.scipy_nodes import powm1
 
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
-    ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima, test_video_url
+    ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima, test_video_url, \
+    image_point_to_real_point
 import glob
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
@@ -123,9 +125,17 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
             assessment_id=assessment_id,
             test_id=test_id
         ).first()
+        use_homograph = homograph_obj.use_homograph if homograph_obj else False
         if not homograph_obj:
             homograph_obj = SingletonHomographicMatrixModel.load()
         distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
+        rp1 = None
+        pt1 = [cx, cy]
+        if use_homograph:
+            rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
+        if rp1:
+            distance = round(np.sqrt(rp1[0] ** 2 + rp1[1] ** 2))
+
         video_obj.distance = distance
         video_obj.is_video_processed = True
         video_obj.progress = 100
@@ -194,14 +204,24 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 assessment_id=assessment_id,
                 test_id=test_id
             ).first()
+            use_homograph = homograph_obj.use_homograph if homograph_obj else False
             if not homograph_obj:
                 homograph_obj = SingletonHomographicMatrixModel.load()
 
-            distance = middle_finger_movement_distance(video_path)
+            distance, pt1, pt2 = middle_finger_movement_distance(video_path)
+
             if not distance:
                 distance = 0
             print(distance)
             distance = distance * homograph_obj.unit_distance / abs(homograph_obj.start_pixel - homograph_obj.end_pixel)
+
+            rp1 = None
+            rp2 = None
+            if use_homograph:
+                rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt2)
+                rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
+            if rp1 and rp2:
+                distance = round(np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2))
             #----#
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
@@ -481,9 +501,13 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             assessment_id=assessment_id,
             test_id=test_id
         ).first()
+
+        use_homograph = homograph_obj.use_homograph if homograph_obj else False
+
         if not homograph_obj:
             print("Calibration was not successful")
             homograph_obj = SingletonHomographicMatrixModel.load()
+            use_homograph = False
 
 
         print(homograph_obj.start_pixel, homograph_obj.end_pixel, pt2[0])
@@ -492,6 +516,11 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         # distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
         distance_ft = round(homograph_obj.unit_distance * abs(pt2[0] - homograph_obj.start_pixel) / abs(
             homograph_obj.start_pixel - homograph_obj.end_pixel), 2)
+        rp1 = None
+        if use_homograph:
+            rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance,pt2)
+        if rp1:
+            distance_ft = round(np.sqrt(rp1[0] ** 2 + rp1[1]**2))
         pt2[1] = pt1[1]
         # img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
         # world_line = cv2.perspectiveTransform(img_line, H)[0]

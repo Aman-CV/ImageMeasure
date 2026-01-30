@@ -12,13 +12,19 @@ import time
 from sklearn.utils import deprecated
 import tempfile
 from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_points_anticlockwise, \
-    process_frame_for_color_centers, correct_white_balance, stretch_contrast
+    process_frame_for_color_centers, correct_white_balance, stretch_contrast, find_yellow_point_lab
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .sit_and_reach_helper_ import detect_carpet_segment_p
 from .task import process_video_task, process_sit_and_throw, process_sit_and_reach
 from django.conf import settings
 import base64
 
+DEFAULT_HOMOGRAPH_POINTS = {
+                "p1": {"fx": None, "fy": None},
+                "p2": {"fx": None, "fy": None},
+                "p3": {"fx": None, "fy": None},
+                "p4": {"fx": None, "fy": None},
+            }
 
 @csrf_exempt
 def upload_video(request):
@@ -138,6 +144,10 @@ def upload_calibration_video(request):
         position_factor = float(request.POST.get('position_factor', 0.5))
         position_factor2 = float(request.POST.get('position_factor2', 0.15))
         assessment_id = request.POST.get('assessment_id', 'notvalid')
+        use_homograph = request.POST.get('use_homograph', 'false').lower()
+        use_homograph = use_homograph in ('true', 'yes', '1', 'on')
+        homograph_points = request.POST.get('hpoints', None)
+        homograph_points = json.loads(homograph_points) if homograph_points else DEFAULT_HOMOGRAPH_POINTS
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp:
             for chunk in video_file.chunks():
                 temp.write(chunk)
@@ -208,31 +218,110 @@ def upload_calibration_video(request):
             singleton.unit_distance = unit_distance
             singleton.end_pixel = max(x1, x2)
             singleton.start_pixel = min(x1, x2)
-            cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)
-            cv2.line(frame, (x2, 0), (x2, h), (0, 0, 255), 2)
+            if use_homograph and homograph_points:
+                for key, point in homograph_points.items():
+                    # Original estimated position
+                    x0 = int(float(point["fx"]) * w)
+                    y0 = int(float(point["fy"]) * h)
+                    basic_bgr = np.uint8([
+                        [0, 0, 255],  # red
+                        [0, 69, 255],  # orange
+                        [0, 255, 255],  # yellow
+                        [0, 200, 0],  # green
+                        [255, 0, 0],  # blue
+                        [130, 0, 75],  # indigo
+                        [238, 130, 238],  # violet
+                    ])
+
+
+                    basic_lab = cv2.cvtColor(
+                        basic_bgr.reshape(1, -1, 3),
+                        cv2.COLOR_BGR2LAB
+                    ).reshape(-1, 3)
+                    clahe = cv2.createCLAHE(
+                        clipLimit=2.0,
+                        tileGridSize=(8, 8)
+                    )
+
+                    x, y = find_yellow_point_lab(
+                        frame,
+                        x0,
+                        y0,
+                        basic_lab,
+                        yellow_idx=2,
+                        clahe=clahe,
+                        window_size=80
+                    )
+
+                    point["fx"] = float(x / w)
+                    point["fy"] = float(y / h)
+                    HALF = 40
+                    # compute ROI explicitly from x0, y0
+                    x1 = max(0, x0 - HALF)
+                    y1 = max(0, y0 - HALF)
+                    x2 = min(w, x0 + HALF)
+                    y2 = min(h, y0 + HALF)
+
+                    # draw ROI square
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 1)
+                    # Draw snapped point
+                    cv2.circle(frame, (x, y), 6, (0, 255, 0), -1)
+
+                    cv2.putText(
+                        frame,
+                        key,
+                        (x + 8, y - 8),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (255, 255, 255),
+                        1,
+                        cv2.LINE_AA,
+                    )
+
+
+            else:
+                cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)
+                cv2.line(frame, (x2, 0), (x2, h), (0, 0, 255), 2)
+            cv2.imwrite("s.jpg", frame)
             _, buffer = cv2.imencode('.jpg', frame)
+            # Replace frame
+            if singleton.file:
+                singleton.file.delete(save=False)
+
             singleton.file.save(
                 'frame.jpg',
                 ContentFile(buffer.tobytes()),
-                save=True
+                save=False
             )
+
+            # Replace mask
+            if singleton.mask:
+                singleton.mask.delete(save=False)
+
             singleton.mask.save(
                 'mask.jpg',
                 ContentFile(buffer.tobytes()),
-                save=True
+                save=False
             )
+
+            singleton.save()
+
             obj, created = CalibrationDataModel.objects.update_or_create(
                 test_id=test_id,
                 assessment_id=assessment_id,
                 defaults={
-                  'start_pixel' : min(x1, x2),
+                    'start_pixel' : min(x1, x2),
                     'end_pixel' : max(x1, x2),
-                    'unit_distance' : unit_distance
+                    'unit_distance' : unit_distance,
+                    'use_homograph': use_homograph,
+                    'homography_points' : homograph_points
                 }
             )
             return JsonResponse({
                 'status': 'success',
+                'hpoints' : homograph_points if homograph_points else {}
             })
+
         singleton = SingletonHomographicMatrixModel.load()
         if singleton.hsv_value:  # will be {} if not set
             h = singleton.hsv_value.get('h', DEFAULT_HSV[0])

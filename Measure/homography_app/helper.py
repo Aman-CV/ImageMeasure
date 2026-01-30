@@ -20,7 +20,6 @@ def test_video_url(assessment_id, test_id, participant_id, vurl):
     # domain = "http://127.0.0.1:8000"
     domain = "http://ec2-13-126-18-144.ap-south-1.compute.amazonaws.com"
     url = f"{domain}/api/coaching/assessment/member/video_upload/"
-
     # Test payload with multiple users
     payload = {
         "variant_scores": [
@@ -770,3 +769,99 @@ def highest_peak_by_adjacent_minima(y, xvs, plot=False):
     return peak_idx, start_idx, end_idx, xvs[start_idx], xvs[end_idx]
 
 
+import cv2
+import numpy as np
+
+
+def image_point_to_real_point(homograph_points, unit_distance, p, w = 1280, h = 720):
+
+    if not homograph_points:
+        raise ValueError("homograph_points is empty or None")
+
+    img_pts = np.array([
+        [homograph_points["p1"]["fx"] * w, homograph_points["p1"]["fy"] * h],
+        [homograph_points["p2"]["fx"] * w, homograph_points["p2"]["fy"] * h],
+        [homograph_points["p3"]["fx"] * w, homograph_points["p3"]["fy"] * h],
+        [homograph_points["p4"]["fx"] * w, homograph_points["p4"]["fy"] * h],
+    ], dtype=np.float32)
+
+    world_pts = np.array([
+        [0, 0],
+        [unit_distance, 0],
+        [unit_distance, unit_distance],
+        [0, unit_distance],
+    ], dtype=np.float32)
+
+    H, _ = cv2.findHomography(img_pts, world_pts)
+    if H is None:
+        raise ValueError("Homography computation failed")
+
+    pt = np.array([[p]], dtype=np.float32)  # shape (1,1,2)
+    real_pt = cv2.perspectiveTransform(pt, H)
+
+    X, Y = real_pt[0][0]
+    return float(X), float(Y)
+
+
+def find_yellow_point_lab(
+    frame,
+    x,
+    y,
+    basic_lab,
+    yellow_idx=2,
+    window_size=32,
+    clahe=None,
+    min_pixels=20,
+):
+    """
+    Returns (new_x, new_y) if yellow is found near (x, y),
+    otherwise returns the original (x, y).
+    """
+
+    h, w = frame.shape[:2]
+    half = window_size // 2
+
+    x1 = max(x - half, 0)
+    y1 = max(y - half, 0)
+    x2 = min(x + half, w)
+    y2 = min(y + half, h)
+
+    roi = frame[y1:y2, x1:x2]
+
+    # Convert to LAB
+    lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB)
+
+    if clahe is not None:
+        L, A, B = cv2.split(lab)
+        L = clahe.apply(L)
+        lab = cv2.merge((L, A, B))
+
+    hh, ww = lab.shape[:2]
+
+    # Use only a,b channels
+    ab = lab[:, :, 1:3].reshape((-1, 2)).astype(np.int16)
+    basic_ab = basic_lab[:, 1:3].astype(np.int16)
+
+    # Nearest base color
+    dists = np.sum((ab[:, None, :] - basic_ab[None, :, :]) ** 2, axis=2)
+    labels = np.argmin(dists, axis=1).reshape(hh, ww)
+
+    # Yellow mask
+    mask = (labels == yellow_idx).astype(np.uint8) * 255
+
+    # Cleanup
+    mask = cv2.medianBlur(mask, 5)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+
+    if cv2.countNonZero(mask) < min_pixels:
+        return x, y
+
+    # Centroid
+    M = cv2.moments(mask)
+    if M["m00"] == 0:
+        return x, y
+
+    cx = int(M["m10"] / M["m00"])
+    cy = int(M["m01"] / M["m00"])
+
+    return x1 + cx, y1 + cy

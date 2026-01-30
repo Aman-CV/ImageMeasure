@@ -93,6 +93,8 @@ class CalibrationDataModel(models.Model):
     start_pixel = models.IntegerField(default=0)
     end_pixel = models.IntegerField(default=1)
     unit_distance = models.FloatField(default=2.5908)
+    use_homograph = models.BooleanField(default=False)
+    homography_points = models.JSONField(default=dict)
 
     def __str__(self):
         return self.test_id
