@@ -20,7 +20,11 @@ def detect_crossing_rightmost_ankle(
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_number = 0
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter("motion_output.mp4", fourcc, fps, (w, h))
     target_id = None
     prev_x = None
     crossed = False
@@ -101,7 +105,7 @@ def detect_crossing_rightmost_ankle(
 
                     cv2.putText(
                         frame,
-                        f"Speed: {100 * speed_mps:.2f} s/100m",
+                        f"Speed: {100 / speed_mps:.2f} s/100m",
                         (30, 60),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1.0,
@@ -127,8 +131,10 @@ def detect_crossing_rightmost_ankle(
             cv2.imshow("Processing", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
+        out.write(frame)
 
     cap.release()
+    out.release()
     cv2.destroyAllWindows()
     return None, None, None
 

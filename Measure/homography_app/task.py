@@ -621,8 +621,8 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
-    with open(video_path, 'rb') as f:
-        video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    #with open(video_path, 'rb') as f:
+    #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
     os.makedirs(output_dir, exist_ok=True)
     try:
@@ -636,12 +636,39 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
         if not homograph_obj:
             homograph_obj = SingletonHomographicMatrixModel.load()
         fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, show=False)
+        print(fno, duration)
         if not duration:
             duration = 0
         video_obj.duration = round(duration,2) - 3
-
+        video_obj.distance = 15.0
         video_obj.is_video_processed = True
         video_obj.progress = 100
+        original_name = os.path.basename(video_obj.file.name)
+
+        final_output_path = f"temp_media_store/processed_{original_name}"
+        if duration < 0.5:
+            logger.info(f"[process_video_task] Detection failed {petvideo_id}")
+            return
+        subprocess.run([
+            'ffmpeg', '-i', "motion_output.mp4",
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+            '-c:a', 'aac', '-movflags', '+faststart', '-y',
+            final_output_path
+        ], check=True)
+
+        with open(final_output_path, 'rb') as f:
+            video_obj.processed_file.save(original_name, File(f), save=False)
+        for path in [final_output_path]:
+            if os.path.exists(path):
+                os.remove(path)
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+        file_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{petvideo_id}{ext}"
+        )
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
