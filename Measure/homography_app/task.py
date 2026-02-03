@@ -8,7 +8,7 @@ import json
 import numpy as np
 from sympy.codegen.scipy_nodes import powm1
 
-from .checkpoint_crossing import detect_crossing_rightmost_ankle
+from .checkpoint_crossing import detect_crossing_rightmost_ankle, detect_crossing_person_box
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
@@ -640,15 +640,33 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
         if not duration:
             duration = 0
         video_obj.duration = round(duration,2) - 3
-        video_obj.distance = 15.0
-        video_obj.is_video_processed = True
-        video_obj.progress = 100
+
         original_name = os.path.basename(video_obj.file.name)
 
         final_output_path = f"temp_media_store/processed_{original_name}"
         if duration < 0.5:
-            logger.info(f"[process_video_task] Detection failed {petvideo_id}")
-            return
+            logger.info(f"[process_video_task] Detection failed retrying {petvideo_id}")
+            fno, duration, _ = detect_crossing_person_box(video_path, homograph_obj.end_pixel, show=False)
+            if duration and duration > 1:
+                video_obj.duration = round(duration, 2) - 3
+                pass
+            else:
+                with open(video_path, 'rb') as f:
+                    video_obj.is_video_processed = True
+                    video_obj.progress = 100
+                    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+                ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+                file_path = os.path.join(
+                    settings.TEMP_VIDEO_STORAGE,
+                    f"videot_{petvideo_id}{ext}"
+                )
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                logger.info(f"[process_video_task] Detection failed {petvideo_id}")
+                return
+        video_obj.distance = 15.0
+        video_obj.is_video_processed = True
+        video_obj.progress = 100
         subprocess.run([
             'ffmpeg', '-i', "motion_output.mp4",
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
