@@ -8,6 +8,7 @@ import json
 import numpy as np
 from sympy.codegen.scipy_nodes import powm1
 
+from .checkpoint_crossing import detect_crossing_rightmost_ankle
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
@@ -133,7 +134,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         pt1 = [cx, cy]
         if use_homograph:
             rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
-        if rp1:
+        if rp1 and use_homograph:
             distance = round(np.sqrt(rp1[0] ** 2 + rp1[1] ** 2))
 
         video_obj.distance = distance
@@ -220,7 +221,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             if use_homograph:
                 rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt2)
                 rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
-            if rp1 and rp2:
+            if use_homograph and rp1 and rp2:
                 distance = round(np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2))
             #----#
             original_name = os.path.basename(video_obj.file.name)
@@ -519,7 +520,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         rp1 = None
         if use_homograph:
             rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance,pt2)
-        if rp1:
+        if rp1 and use_homograph:
             distance_ft = round(np.sqrt(rp1[0] ** 2 + rp1[1]**2))
         pt2[1] = pt1[1]
         # img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
@@ -593,5 +594,58 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
 
 
 @background(schedule=0, remove_existing_tasks=True)
-def process_broad_jump(petvideo_id):
-    pass
+def process_15m_dash(petvideo_id, test_id, assessment_id):
+    logger.info(f"[process_video_task] STARTED TEST/ ASSESSMENT ID: {petvideo_id}")
+    if test_id == "" or assessment_id == "":
+        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
+        return
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        return
+    # if not video_obj.to_be_processed:
+    #     with open(video_obj.file.path, 'rb') as f:
+    #         video_obj.is_video_processed = True
+    #         video_obj.progress = 100
+    #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
+    #     return
+    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+    video_path = os.path.join(
+        settings.TEMP_VIDEO_STORAGE,
+        f"videot_{petvideo_id}{ext}"
+    )
+    if not os.path.exists(video_path):
+        download_and_save_video(video_obj)
+    if video_obj.processed_file:
+        video_obj.processed_file.delete(save=False)
+        video_obj.processed_file = None
+    with open(video_path, 'rb') as f:
+        video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
+    os.makedirs(output_dir, exist_ok=True)
+    try:
+        video_obj.is_video_processed = False
+        video_obj.progress = 0
+        homograph_obj = CalibrationDataModel.objects.filter(
+            assessment_id=assessment_id,
+            test_id=test_id
+        ).first()
+        use_homograph = False
+        if not homograph_obj:
+            homograph_obj = SingletonHomographicMatrixModel.load()
+        fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, show=False)
+        if not duration:
+            duration = 0
+        video_obj.duration = round(duration,2) - 3
+
+        video_obj.is_video_processed = True
+        video_obj.progress = 100
+        video_obj.save()
+        test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
+        logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
+
+    except Exception as e:
+        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+

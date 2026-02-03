@@ -15,7 +15,7 @@ from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_
     process_frame_for_color_centers, correct_white_balance, stretch_contrast, find_yellow_point_lab
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .sit_and_reach_helper_ import detect_carpet_segment_p
-from .task import process_video_task, process_sit_and_throw, process_sit_and_reach
+from .task import process_video_task, process_sit_and_throw, process_sit_and_reach, process_15m_dash
 from django.conf import settings
 import base64
 
@@ -120,6 +120,8 @@ def upload_video(request):
         elif test_id == "vPbXoPK4":
             print("I was here")
             process_sit_and_reach(obj.id, test_id=test_id, assessment_id=assessment_id)
+        elif test_id == "lzb1PEKm":
+            process_15m_dash(obj.id,test_id=test_id,assessment_id=assessment_id)
         else:
             process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id)
         return JsonResponse({
@@ -208,7 +210,7 @@ def upload_calibration_video(request):
             return JsonResponse({
                 'status': 'success',
             })
-        if test_id == "BwbJyXKl" or test_id == "G6bWk0bW" or test_id == "vPbXoPK4":
+        if test_id == "BwbJyXKl" or test_id == "G6bWk0bW" or test_id == "vPbXoPK4" or test_id == "lzb1PEKm":
             singleton = SingletonHomographicMatrixModel.load()
             h, w = frame.shape[:2]
 

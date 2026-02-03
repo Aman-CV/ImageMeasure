@@ -47,6 +47,7 @@ class PetVideos(models.Model):
             process_sit_and_reach,
             process_sit_and_throw,
             process_video_task,
+            process_15m_dash
         )
 
         if self.test_id in ("vPbXoPK4", "reach"):
@@ -62,6 +63,9 @@ class PetVideos(models.Model):
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
             )
+        elif self.test_id in ("lzb1PEKm", "15run"):
+            return process_15m_dash(self.id, test_id=self.test_id,assessment_id=self.assessment_id)
+
 
         return process_video_task(
             self.id,
