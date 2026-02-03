@@ -98,7 +98,7 @@ def detect_crossing_rightmost_ankle(
 
             if start_time is not None and meters_per_pixel is not None:
                 covered_m = abs(x_ankle - start_x) * meters_per_pixel
-                delta_t = current_time - start_time
+                delta_t = current_time - start_time - 3
 
                 if delta_t > 0:
                     speed_mps = covered_m / delta_t
@@ -181,7 +181,7 @@ def detect_crossing_person_box(
             frame,
             persist=True,
             conf=conf,
-            classes=[0],  # 👤 person only
+            classes=[0],
             verbose=False
         )
 
@@ -220,13 +220,11 @@ def detect_crossing_person_box(
 
             x1, y1, x2, y2 = box
 
-            # ---- pseudo-ankle: 0.75 width, bottom of box ----
             x_pos = x1 + 0.75 * (x2 - x1)
             y_pos = y2
 
             current_time = frame_number / fps
 
-            # ---- speed estimation ----
             if start_x is not None:
                 if meters_per_pixel is None:
                     pixel_dist = abs(start_x - x_B)
@@ -235,7 +233,7 @@ def detect_crossing_person_box(
 
                 if meters_per_pixel is not None:
                     covered_m = abs(x_pos - start_x) * meters_per_pixel
-                    delta_t = current_time - start_time
+                    delta_t = current_time - start_time - 3
 
                     if delta_t > 0:
                         speed_mps = covered_m / delta_t
