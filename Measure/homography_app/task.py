@@ -648,7 +648,7 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
             logger.info(f"[process_video_task] Detection failed retrying {petvideo_id}")
             fno, duration, _ = detect_crossing_person_box(video_path, homograph_obj.end_pixel, show=False)
             if duration and duration > 1:
-                video_obj.duration = round(duration, 2) - 3
+                video_obj.duration = round(duration, 2) - 3.5
                 pass
             else:
                 with open(video_path, 'rb') as f:

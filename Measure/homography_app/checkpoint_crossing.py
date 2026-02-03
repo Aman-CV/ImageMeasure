@@ -98,7 +98,7 @@ def detect_crossing_rightmost_ankle(
 
             if start_time is not None and meters_per_pixel is not None:
                 covered_m = abs(x_ankle - start_x) * meters_per_pixel
-                delta_t = current_time - start_time - 3
+                delta_t = current_time - start_time - 3.5
 
                 if delta_t > 0:
                     speed_mps = covered_m / delta_t
@@ -233,7 +233,7 @@ def detect_crossing_person_box(
 
                 if meters_per_pixel is not None:
                     covered_m = abs(x_pos - start_x) * meters_per_pixel
-                    delta_t = current_time - start_time - 3
+                    delta_t = current_time - start_time - 3.5
 
                     if delta_t > 0:
                         speed_mps = covered_m / delta_t
