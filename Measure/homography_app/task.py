@@ -132,10 +132,15 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
         rp1 = None
         pt1 = [cx, cy]
+        rp2 = None
         if use_homograph:
             rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
-        if rp1 and use_homograph:
-            distance = round(np.sqrt(rp1[0] ** 2 + rp1[1] ** 2))
+            if homograph_obj.origin_y != 0 and homograph_obj.origin_x != 0:
+                origin = np.array([homograph_obj.origin_x, homograph_obj.origin_y])
+                rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, origin)
+
+        if rp1 and rp2 and use_homograph:
+            distance = round(np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2))
 
         video_obj.distance = distance
         video_obj.is_video_processed = True
@@ -518,10 +523,14 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         distance_ft = round(homograph_obj.unit_distance * abs(pt2[0] - homograph_obj.start_pixel) / abs(
             homograph_obj.start_pixel - homograph_obj.end_pixel), 2)
         rp1 = None
+        rp2 = None
         if use_homograph:
             rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance,pt2)
-        if rp1 and use_homograph:
-            distance_ft = round(np.sqrt(rp1[0] ** 2 + rp1[1]**2))
+            if homograph_obj.origin_x != 0 and homograph_obj.origin_y != 0:
+                origin = np.array([homograph_obj.origin_x, homograph_obj.origin_y])
+                rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, origin)
+        if rp1 and rp2 and use_homograph:
+            distance_ft = round(np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2))
         pt2[1] = pt1[1]
         # img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
         # world_line = cv2.perspectiveTransform(img_line, H)[0]

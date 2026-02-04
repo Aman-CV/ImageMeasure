@@ -148,7 +148,12 @@ def upload_calibration_video(request):
         assessment_id = request.POST.get('assessment_id', 'notvalid')
         use_homograph = request.POST.get('use_homograph', 'false').lower()
         use_homograph = use_homograph in ('true', 'yes', '1', 'on')
+        use_sam_homograph = request.POST.get('use_sam_homograph', 'false').lower()
+        use_sam_homograph = use_sam_homograph in ('true', 'yes', '1', 'on')
         homograph_points = request.POST.get('hpoints', None)
+        origin_x = float(request.POST.get('origin_x', 0))
+        origin_y = float(request.POST.get('origin_y', 0))
+
         homograph_points = json.loads(homograph_points) if homograph_points else DEFAULT_HOMOGRAPH_POINTS
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp:
             for chunk in video_file.chunks():
@@ -194,23 +199,9 @@ def upload_calibration_video(request):
                 'message': 'Could not extract frame from video'
             }, status=400)
         frame = cv2.resize(frame, (1280, 720))
-        cv2.imwrite("media/cal_orig.jpg", frame)
         # if test_id == "vPbXoPK4":
         #     frame = stretch_contrast(frame)
-        cv2.imwrite("media/cal.jpg", frame)
-        if test_id == "notvalid":
-            mask, _, _  = detect_carpet_segment_p(frame)
-            singleton = SingletonHomographicMatrixModel.load()
-            _, buffer = cv2.imencode('.jpg', mask)
-            singleton.mask.save(
-                'mask.jpg',
-                ContentFile(buffer.tobytes()),
-                save=True
-            )
-            return JsonResponse({
-                'status': 'success',
-            })
-        if test_id == "BwbJyXKl" or test_id == "G6bWk0bW" or test_id == "vPbXoPK4" or test_id == "lzb1PEKm":
+        if not use_sam_homograph and (test_id == "BwbJyXKl" or test_id == "G6bWk0bW" or test_id == "vPbXoPK4" or test_id == "lzb1PEKm"):
             singleton = SingletonHomographicMatrixModel.load()
             h, w = frame.shape[:2]
 
@@ -331,19 +322,36 @@ def upload_calibration_video(request):
             v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
         else:
             h, s, v = DEFAULT_HSV
-        selected_point = [int(1280 * 0.422), int(720 * 0.75)]
+        p1 = [
+            int(homograph_points["p1"]["fx"] * 1280),
+            int(homograph_points["p1"]["fy"] * 720)
+        ]
+
+        p2 = [
+            int(homograph_points["p2"]["fx"] * 1280),
+            int(homograph_points["p2"]["fy"] * 720)
+        ]
+
+        selected_point = p1
+        origin = p2
         print(selected_point)
-        points = process_frame_for_color_centers(frame, selected_point=selected_point, target_hsv=(h, s, v))
+        cv2.imwrite("media/cal_orig.jpg", frame)
+        points, pt2 = process_frame_for_color_centers(frame, selected_point=selected_point)
         print(points)
         points = merge_close_points(points, threshold=10)
         print(points)
         points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
-        if len(points) < 4:
-            return JsonResponse({
-                'status': 'error',
-                'message': f'Failed to detect exactly 4 points. Detected: {len(points)}'
-            }, status=400)
-        cv2.imwrite("media/tihis.jpg", frame)
+        if len(points) != 4:
+            if len(pt2) == 4:
+                points = pt2
+                points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
+                unit_distance = 10 #change this to mat
+                print("Change", pt2)
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Failed to detect exactly 4 points. Detected: {len(points)}'
+                }, status=400)
         if len(points) < 6:
             points = points_sorted[:4]
             world_pts = np.array([
@@ -362,7 +370,6 @@ def upload_calibration_video(request):
                 [unit_distance, unit_distance],
                 [0, unit_distance]
             ], dtype=np.float32)
-
         order_points = np.array(order_points_anticlockwise(points))
         print(order_points, world_pts)
         H, _ = cv2.findHomography(order_points, world_pts)
@@ -391,12 +398,15 @@ def upload_calibration_video(request):
                 1
             )
         _, buffer = cv2.imencode('.jpg', frame)
-
+        if homography_obj.file:
+            homography_obj.file.delete(save=False)
         homography_obj.file.save(
             'mask.jpg',
             ContentFile(buffer.tobytes()),
             save=False
         )
+        if homography_obj.mask:
+            homography_obj.mask.delete(save=False)
         homography_obj.mask.save(
             'mask.jpg',
             ContentFile(buffer.tobytes()),
@@ -404,9 +414,30 @@ def upload_calibration_video(request):
         )
 
         homography_obj.save()
+        i = 0
+        print("Oriign", origin_x, origin_y)
+        print(homograph_points)
+        for key, point in homograph_points.items():
+            point["fx"] = float(order_points[i][0] / 1280.0)
+            point["fy"] = float(order_points[i][1] / 720.0)
+            i += 1
 
+        obj, created = CalibrationDataModel.objects.update_or_create(
+            test_id=test_id,
+            assessment_id=assessment_id,
+            defaults={
+                'start_pixel': 0,
+                'end_pixel': 1,
+                'unit_distance': unit_distance,
+                'use_homograph': use_homograph,
+                'homography_points': homograph_points,
+                'origin_x': int(origin_x * 1280),
+                'origin_y': int(origin_y * 720)
+            }
+        )
         return JsonResponse({
             'status': 'success',
+            'hpoints': homograph_points if homograph_points else {}
         })
 
     return JsonResponse({

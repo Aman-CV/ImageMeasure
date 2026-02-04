@@ -11,10 +11,89 @@ import math
 import requests
 from dotenv import load_dotenv
 import os
+import torch
+import numpy as np
+from segment_anything import sam_model_registry, SamPredictor
 
 load_dotenv()
 
 TOKEN = os.getenv("VIDEO_UPLOAD_TOKEN")
+
+
+def order_quad_points(pts):
+    """
+    Order points as:
+    1: bottom-left
+    2: bottom-right
+    3: top-right
+    4: top-left
+    """
+
+    rect = np.zeros((4, 2), dtype=np.float32)
+
+    s = pts.sum(axis=1)
+    diff = np.diff(pts, axis=1)
+
+    top_left = pts[np.argmin(s)]
+    bottom_right = pts[np.argmax(s)]
+    top_right = pts[np.argmin(diff)]
+    bottom_left = pts[np.argmax(diff)]
+
+    rect[0] = bottom_left
+    rect[1] = bottom_right
+    rect[2] = top_right
+    rect[3] = top_left
+
+    return rect
+
+
+def get_mask_corners(mask):
+    """
+    Given a binary mask (0/255), find the 4 corner points of the largest region.
+
+    Returns:
+        np.ndarray of shape (4, 2) with (x, y) points ordered clockwise
+        or None if corners cannot be found
+    """
+
+    # ---- Ensure uint8 ----
+    mask_uint8 = mask.astype(np.uint8)
+
+    # ---- Find contours ----
+    contours, _ = cv2.findContours(
+        mask_uint8,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    if not contours:
+        return None
+
+    # ---- Select largest contour by area ----
+    largest_contour = max(contours, key=cv2.contourArea)
+
+    # ---- Approximate polygon ----
+    epsilon = 0.02 * cv2.arcLength(largest_contour, True)
+    approx = cv2.approxPolyDP(largest_contour, epsilon, True)
+
+    # ---- If not 4 points, relax epsilon ----
+    if len(approx) != 4:
+        for eps_scale in [0.03, 0.04, 0.05]:
+            approx = cv2.approxPolyDP(
+                largest_contour,
+                eps_scale * cv2.arcLength(largest_contour, True),
+                True
+            )
+            if len(approx) == 4:
+                break
+
+    if len(approx) != 4:
+        return None
+
+    pts = approx.reshape(4, 2)
+
+    return order_quad_points(pts)
+
 
 def test_video_url(assessment_id, test_id, participant_id, vurl):
     # domain = "http://127.0.0.1:8000"
@@ -308,7 +387,7 @@ def get_flat_start(y, window=30):
         return True, [flat_regions[mid-1], flat_regions[mid]]
 
 def order_points_anticlockwise(points):
-    if len(points) < 3:
+    if len(points) != 4:
         raise ValueError("Need at least 3 points to order anticlockwise.")
 
     max_y = max(p[1] for p in points)
@@ -321,6 +400,9 @@ def order_points_anticlockwise(points):
         return math.atan2(p[1] - cy, p[0] - cx)
 
     sorted_points = sorted(points, key=angle, reverse=True)
+
+    sorted_points = [tuple(p) for p in sorted_points]
+    start = tuple(start)
 
     if start in sorted_points:
         i = sorted_points.index(start)
@@ -648,9 +730,10 @@ def separate_color_by_hsv(
     h, s, v = target_hsv
 
     # --- Build a fixed color palette ---
-    # target color
-    target_color = np.uint8([[target_hsv]])
-    target_bgr = cv2.cvtColor(target_color, cv2.COLOR_HSV2BGR)[0, 0]
+    # ignore the input use yellow target color
+    target_color = np.uint8([[[160, 100, 170]]])  # shape (1, 1, 3)
+    ttarget_bgr = cv2.cvtColor(target_color, cv2.COLOR_HSV2BGR)[0, 0]
+
     target_bgr = np.array([0, 230, 230], dtype = np.uint8)
     target_bgr2 = np.array([30, 150, 200], dtype = np.uint8)
 
@@ -670,7 +753,7 @@ def separate_color_by_hsv(
     mask = mask.reshape(segmented_region.shape[:2])
 
         # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    #mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     # mask = cv2.erode(mask, np.ones((3, 3), np.uint8), iterations=1)
 
     separated = cv2.bitwise_and(segmented_region, segmented_region, mask=mask)
@@ -711,9 +794,11 @@ def get_mask_centers(mask, return_largest=False):
 
 def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110, 122, 140)):
 
-
-    segment_mask, segmented_region = detect_carpet_segment(frame, selected_point=selected_point)
+    segment_mask, segmented_region, fallback = segment_object_sam(frame, point=selected_point)
+    #    segment_mask, segmented_region = detect_carpet_segment(frame, selected_point=selected_point)
     cv2.imwrite("media/temp.jpg", segmented_region)
+    cv2.imwrite("media/temp0.jpg", segment_mask)
+    cv2.imwrite("media/cal.jpg", fallback)
     if segmented_region is None or np.count_nonzero(segment_mask) == 0:
         print("No carpet region detected.")
         return []
@@ -724,8 +809,8 @@ def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110,
 
 
     centers = get_mask_centers(mask, return_largest=False)
-
-    return centers
+    pt2 = get_mask_corners(segment_mask)
+    return centers, pt2
 
 
 def highest_peak_by_adjacent_minima(y, xvs, plot=False):
@@ -769,8 +854,107 @@ def highest_peak_by_adjacent_minima(y, xvs, plot=False):
     return peak_idx, start_idx, end_idx, xvs[start_idx], xvs[end_idx]
 
 
-import cv2
-import numpy as np
+def segment_object_sam(
+    image_bgr,
+    point=None,
+    checkpoint="sam_vit_b_01ec64.pth",
+    kernel_size=7,
+    device=None,
+    debug=True,
+    debug_path="debug_segmentation.png"
+):
+    """
+    Segment an object from an image using SAM given a single click point.
+
+    Args:
+        image_bgr (np.ndarray): Input image (BGR).
+        point (tuple or None): (x, y). If None or out of bounds, image center is used.
+        checkpoint (str): Path to SAM checkpoint.
+        kernel_size (int): Morphological closing kernel size.
+        device (str or None): 'cuda' or 'cpu'.
+        debug (bool): If True, save debug overlay image.
+        debug_path (str): Path to save debug image.
+
+    Returns:
+        np.ndarray: Binary mask (uint8, 0 or 255).
+    """
+
+    h, w = image_bgr.shape[:2]
+
+    # ---- Validate / default point ----
+    if (
+        point is None or
+        point[0] < 0 or point[1] < 0 or
+        point[0] >= w or point[1] >= h
+    ):
+        point = (w // 2, h // 2)
+
+    # ---- Device ----
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # ---- Load SAM ----
+    sam = sam_model_registry["vit_b"](checkpoint=checkpoint)
+    sam.to(device)
+    predictor = SamPredictor(sam)
+
+    # ---- Prepare image ----
+    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    predictor.set_image(image_rgb)
+
+    # ---- Predict ----
+    input_points = np.array([[point[0], point[1]]])
+    input_labels = np.array([1])  # foreground
+
+    masks, scores, _ = predictor.predict(
+        point_coords=input_points,
+        point_labels=input_labels,
+        multimask_output=True
+    )
+
+    best_mask = masks[np.argmax(scores)]
+
+    # ---- Morphological hole filling ----
+    mask_uint8 = best_mask.astype(np.uint8) * 255
+
+    kernel_open = np.ones((5, 5), np.uint8)  # remove small islands
+    kernel_close = np.ones((9, 9), np.uint8)  # fill holes
+
+    # mask_uint8: 0 / 255
+    mask_clean = cv2.morphologyEx(
+        mask_uint8,
+        cv2.MORPH_OPEN,
+        kernel_open
+    )
+
+    mask_filled = cv2.morphologyEx(
+        mask_clean,
+        cv2.MORPH_CLOSE,
+        kernel_close
+    )
+    debug_img = None
+    # ---- Debug overlay save ----
+    if debug:
+        overlay = image_bgr.copy()
+        overlay[mask_filled == 255] = (0, 255, 0)
+
+        # Blend for nicer visualization
+        debug_img = cv2.addWeighted(
+            overlay, 0.4,
+            image_bgr, 0.6,
+            0
+        )
+
+        # Draw click point
+        cv2.circle(debug_img, point, 6, (0, 0, 255), -1)
+
+        cv2.imwrite(debug_path, debug_img)
+    masked_image = cv2.bitwise_and(
+        image_bgr,
+        image_bgr,
+        mask=mask_filled
+    )
+    return mask_filled, masked_image, debug_img
 
 
 def image_point_to_real_point(homograph_points, unit_distance, p, w = 1280, h = 720):
@@ -865,3 +1049,5 @@ def find_yellow_point_lab(
     cy = int(M["m01"] / M["m00"])
 
     return x1 + cx, y1 + cy
+
+
