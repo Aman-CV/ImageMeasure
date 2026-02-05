@@ -51,10 +51,12 @@ def detect_crossing_rightmost_ankle(
                 cv2.imshow("Processing", frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
+            out.write(frame)
             continue
 
         keypoints = r.keypoints.xy.cpu().numpy()
         if len(keypoints) == 0 :
+            out.write(frame)
             continue
 
         ids = r.boxes.id.cpu().numpy().astype(int)
@@ -67,6 +69,7 @@ def detect_crossing_rightmost_ankle(
                 right_ankle = kp[16]
 
                 if left_ankle[0] == 0 or right_ankle[0] == 0:
+                    out.write(frame)
                     continue
 
                 x_ankle = max(left_ankle[0], right_ankle[0])
@@ -91,6 +94,7 @@ def detect_crossing_rightmost_ankle(
             right_ankle = kp[16]
 
             if left_ankle[0] == 0 or right_ankle[0] == 0:
+                out.write(frame)
                 continue
 
             x_ankle = max(left_ankle[0] , right_ankle[0])  + 10
@@ -192,6 +196,7 @@ def detect_crossing_person_box(
                 cv2.imshow("Processing", frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
+            out.write(frame)
             continue
 
         ids = r.boxes.id.cpu().numpy().astype(int)
@@ -211,9 +216,7 @@ def detect_crossing_person_box(
                     start_x = x_pos
                     start_time = frame_number / fps
 
-        # --------------------------------
-        # Track selected person
-        # --------------------------------
+
         for box, track_id in zip(boxes, ids):
             if track_id != target_id:
                 continue

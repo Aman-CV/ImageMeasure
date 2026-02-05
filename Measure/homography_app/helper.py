@@ -794,11 +794,11 @@ def get_mask_centers(mask, return_largest=False):
 
 def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110, 122, 140)):
 
-    segment_mask, segmented_region, fallback = segment_object_sam(frame, point=selected_point)
+    segment_mask, segmented_region, fallback, bm = segment_object_sam(frame, point=selected_point)
     #    segment_mask, segmented_region = detect_carpet_segment(frame, selected_point=selected_point)
     cv2.imwrite("media/temp.jpg", segmented_region)
     cv2.imwrite("media/temp0.jpg", segment_mask)
-    cv2.imwrite("media/cal.jpg", fallback)
+    cv2.imwrite("media/cal.jpg", bm)
     if segmented_region is None or np.count_nonzero(segment_mask) == 0:
         print("No carpet region detected.")
         return []
@@ -809,7 +809,7 @@ def process_frame_for_color_centers(frame, selected_point=None, target_hsv=(110,
 
 
     centers = get_mask_centers(mask, return_largest=False)
-    pt2 = get_mask_corners(segment_mask)
+    pt2 = get_mask_corners(bm)
     return centers, pt2
 
 
@@ -918,7 +918,7 @@ def segment_object_sam(
     mask_uint8 = best_mask.astype(np.uint8) * 255
 
     kernel_open = np.ones((5, 5), np.uint8)  # remove small islands
-    kernel_close = np.ones((9, 9), np.uint8)  # fill holes
+    kernel_close = np.ones((21, 21), np.uint8)  # fill holes
 
     # mask_uint8: 0 / 255
     mask_clean = cv2.morphologyEx(
@@ -954,7 +954,7 @@ def segment_object_sam(
         image_bgr,
         mask=mask_filled
     )
-    return mask_filled, masked_image, debug_img
+    return mask_filled, masked_image, debug_img, mask_uint8
 
 
 def image_point_to_real_point(homograph_points, unit_distance, p, w = 1280, h = 720):

@@ -15,7 +15,7 @@ from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_
     process_frame_for_color_centers, correct_white_balance, stretch_contrast, find_yellow_point_lab
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .sit_and_reach_helper_ import detect_carpet_segment_p
-from .task import process_video_task, process_sit_and_throw, process_sit_and_reach, process_15m_dash
+from .task import process_video_task, process_sit_and_throw, process_sit_and_reach, process_15m_dash, process_plank
 from django.conf import settings
 import base64
 
@@ -25,6 +25,13 @@ DEFAULT_HOMOGRAPH_POINTS = {
                 "p3": {"fx": None, "fy": None},
                 "p4": {"fx": None, "fy": None},
             }
+
+FALL_BACK = {
+    'vPbXoPK4' : 20,
+    'BwbJyXKl' : 1.4224,
+    'default' : 1,
+    'G6bWk0bW' : 1.4224
+}
 
 @csrf_exempt
 def upload_video(request):
@@ -118,10 +125,11 @@ def upload_video(request):
         if test_id == "BwbJyXKl":
             process_sit_and_throw(obj.id, test_id=test_id, assessment_id =assessment_id)
         elif test_id == "vPbXoPK4":
-            print("I was here")
             process_sit_and_reach(obj.id, test_id=test_id, assessment_id=assessment_id)
         elif test_id == "lzb1PEKm":
             process_15m_dash(obj.id,test_id=test_id,assessment_id=assessment_id)
+        elif test_id == "Vnb7E6L6":
+            process_plank(obj.id, test_id=test_id, assessment_id=assessment_id)
         else:
             process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id)
         return JsonResponse({
@@ -333,19 +341,21 @@ def upload_calibration_video(request):
         ]
 
         selected_point = p1
-        origin = p2
         print(selected_point)
         cv2.imwrite("media/cal_orig.jpg", frame)
         points, pt2 = process_frame_for_color_centers(frame, selected_point=selected_point)
         print(points)
-        points = merge_close_points(points, threshold=10)
+        points = merge_close_points(points, threshold=25)
         print(points)
         points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
+        end_point_of_mat = "Normal Calibration Successful"
         if len(points) != 4:
             if len(pt2) == 4:
                 points = pt2
+                end_point_of_mat = "Markers not detected using end points of mat"
+
                 points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
-                unit_distance = 10 #change this to mat
+                unit_distance = FALL_BACK.get(test_id, 1)
                 print("Change", pt2)
             else:
                 return JsonResponse({
@@ -437,7 +447,8 @@ def upload_calibration_video(request):
         )
         return JsonResponse({
             'status': 'success',
-            'hpoints': homograph_points if homograph_points else {}
+            'hpoints': homograph_points if homograph_points else {},
+            'message' : end_point_of_mat
         })
 
     return JsonResponse({

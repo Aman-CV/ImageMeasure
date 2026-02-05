@@ -18,6 +18,7 @@ import glob
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
 
+from .plank_helper import mark_right_side_pose
 from .sit_and_reach_helper_ import detect_yellow_strip_positions_mask, find_three_centers_from_mask, \
     estimate_distance_between_points, middle_finger_movement_distance
 from .sit_and_throw_helper import get_first_bounce_frame, get_first_bounce_frame_MOG
@@ -698,6 +699,78 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
             os.remove(file_path)
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
+        logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
+
+    except Exception as e:
+        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+
+
+@background(schedule=0, remove_existing_tasks=True)
+def process_plank(petvideo_id, test_id, assessment_id):
+    logger.info(f"[process_video_task] STARTED TEST/ ASSESSMENT ID: {petvideo_id}")
+    if test_id == "" or assessment_id == "":
+        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
+        return
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        return
+    # if not video_obj.to_be_processed:
+    #     with open(video_obj.file.path, 'rb') as f:
+    #         video_obj.is_video_processed = True
+    #         video_obj.progress = 100
+    #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
+    #     return
+    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+    video_path = os.path.join(
+        settings.TEMP_VIDEO_STORAGE,
+        f"videot_{petvideo_id}{ext}"
+    )
+    if not os.path.exists(video_path):
+        download_and_save_video(video_obj)
+    if video_obj.processed_file:
+        video_obj.processed_file.delete(save=False)
+        video_obj.processed_file = None
+    # with open(video_path, 'rb') as f:
+    #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
+    os.makedirs(output_dir, exist_ok=True)
+    try:
+        video_obj.is_video_processed = False
+        video_obj.progress = 0
+
+
+        original_name = os.path.basename(video_obj.file.name)
+        mark_right_side_pose(video_path, conf=0.2)
+        final_output_path = f"temp_media_store/processed_{original_name}"
+        video_obj.distance = 0.0
+        video_obj.is_video_processed = True
+        video_obj.progress = 100
+        subprocess.run([
+            'ffmpeg', '-i', "motion_output.mp4",
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+            '-c:a', 'aac', '-movflags', '+faststart', '-y',
+            final_output_path
+        ], check=True)
+
+        with open(final_output_path, 'rb') as f:
+            video_obj.processed_file.save(original_name, File(f), save=False)
+        for path in [final_output_path]:
+            if os.path.exists(path):
+                os.remove(path)
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+        file_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{petvideo_id}{ext}"
+        )
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        video_obj.save()
+        test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id,
+                       vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
 
     except Exception as e:

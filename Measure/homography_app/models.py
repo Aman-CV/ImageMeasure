@@ -8,6 +8,7 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 
+
 def processed_file_name(instance, old_filename):
     extension = os.path.splitext(old_filename)[1]
     filename = str(uuid.uuid4()) + extension
@@ -47,7 +48,8 @@ class PetVideos(models.Model):
             process_sit_and_reach,
             process_sit_and_throw,
             process_video_task,
-            process_15m_dash
+            process_15m_dash,
+        process_plank
         )
 
         if self.test_id in ("vPbXoPK4", "reach"):
@@ -66,6 +68,8 @@ class PetVideos(models.Model):
         elif self.test_id in ("lzb1PEKm", "15run"):
             return process_15m_dash(self.id, test_id=self.test_id,assessment_id=self.assessment_id)
 
+        elif self.test_id in ("Vnb7E6L6", "6x10run"):
+            return process_plank(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
 
         return process_video_task(
             self.id,
