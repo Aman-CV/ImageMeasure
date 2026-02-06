@@ -128,7 +128,7 @@ def upload_video(request):
             process_sit_and_reach(obj.id, test_id=test_id, assessment_id=assessment_id)
         elif test_id == "lzb1PEKm":
             process_15m_dash(obj.id,test_id=test_id,assessment_id=assessment_id)
-        elif test_id == "Vnb7E6L6":
+        elif test_id == "vmK617LE":
             process_plank(obj.id, test_id=test_id, assessment_id=assessment_id)
         else:
             process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id)
