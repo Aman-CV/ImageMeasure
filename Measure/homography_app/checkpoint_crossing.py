@@ -8,6 +8,7 @@ def detect_crossing_rightmost_ankle(
     resize_width=1280,
     resize_height=720,
     conf=0.5,
+    reference = 15.0,
     show=False
 ):
 
@@ -61,7 +62,6 @@ def detect_crossing_rightmost_ankle(
 
         ids = r.boxes.id.cpu().numpy().astype(int)
 
-        # Select target (right-most person in first valid frame)
         if target_id is None:
             max_x = 10000
             for kp, track_id in zip(keypoints, ids):
@@ -83,7 +83,7 @@ def detect_crossing_rightmost_ankle(
         if meters_per_pixel is None and start_x is not None:
             pixel_dist = abs(start_x - x_B)
             if pixel_dist > 0:
-                meters_per_pixel = 15.0 / pixel_dist
+                meters_per_pixel = reference / pixel_dist
 
         # Track target
         for kp, track_id in zip(keypoints, ids):
@@ -150,7 +150,8 @@ def detect_crossing_person_box(
     resize_width=1280,
     resize_height=720,
     conf=0.3,
-    show=False
+    show=False,
+    reference=15,
 ):
     model = YOLO("yolov8m.pt")
     cap = cv2.VideoCapture(video_path)
@@ -232,7 +233,7 @@ def detect_crossing_person_box(
                 if meters_per_pixel is None:
                     pixel_dist = abs(start_x - x_B)
                     if pixel_dist > 0:
-                        meters_per_pixel = 15.0 / pixel_dist
+                        meters_per_pixel = reference / pixel_dist
 
                 if meters_per_pixel is not None:
                     covered_m = abs(x_pos - start_x) * meters_per_pixel

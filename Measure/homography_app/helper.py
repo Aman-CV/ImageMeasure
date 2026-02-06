@@ -48,13 +48,7 @@ def order_quad_points(pts):
 
 
 def get_mask_corners(mask):
-    """
-    Given a binary mask (0/255), find the 4 corner points of the largest region.
 
-    Returns:
-        np.ndarray of shape (4, 2) with (x, y) points ordered clockwise
-        or None if corners cannot be found
-    """
 
     # ---- Ensure uint8 ----
     mask_uint8 = mask.astype(np.uint8)

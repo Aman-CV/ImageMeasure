@@ -130,7 +130,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         use_homograph = homograph_obj.use_homograph if homograph_obj else False
         if not homograph_obj:
             homograph_obj = SingletonHomographicMatrixModel.load()
-        distance = round(homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel),2)
+        distance = homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel)
         rp1 = None
         pt1 = [cx, cy]
         rp2 = None
@@ -141,7 +141,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
                 rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, origin)
 
         if rp1 and rp2 and use_homograph:
-            distance = round(np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2))
+            distance = np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2)
 
         video_obj.distance = distance
         video_obj.is_video_processed = True
@@ -228,7 +228,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt2)
                 rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
             if use_homograph and rp1 and rp2:
-                distance = round(np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2))
+                distance = np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2)
             #----#
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
@@ -253,7 +253,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 logger.info(f"[process_video_task] Finger tip detection failed: {petvideo_id}")
             else:
                 print(distance)
-            video_obj.distance = round(distance if distance else 0, 2)
+            video_obj.distance = distance if distance else 0
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.save()
@@ -346,7 +346,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 logger.info(f"[process_video_task] All markers not detected: {petvideo_id}")
             else:
                 print(centers_sorted)
-            video_obj.distance = round(distance if distance else 0, 2)
+            video_obj.distance = distance if distance else 0
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.save()
@@ -520,9 +520,9 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         print(homograph_obj.start_pixel, homograph_obj.end_pixel, pt2[0])
         # if homograph_obj.start_pixel_broad_jump != 1:
         #     pt1[0] = homograph_obj.start_pixel_broad_jump
-        # distance_ft = round(distance_from_homography(pt1, pt2, H), 2)
-        distance_ft = round(homograph_obj.unit_distance * abs(pt2[0] - homograph_obj.start_pixel) / abs(
-            homograph_obj.start_pixel - homograph_obj.end_pixel), 2)
+        # distance_ft = distance_from_homography(pt1, pt2, H)
+        distance_ft = homograph_obj.unit_distance * abs(pt2[0] - homograph_obj.start_pixel) / abs(
+            homograph_obj.start_pixel - homograph_obj.end_pixel)
         rp1 = None
         rp2 = None
         if use_homograph:
@@ -531,7 +531,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 origin = np.array([homograph_obj.origin_x, homograph_obj.origin_y])
                 rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, origin)
         if rp1 and rp2 and use_homograph:
-            distance_ft = round(np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2))
+            distance_ft = np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2)
         pt2[1] = pt1[1]
         # img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
         # world_line = cv2.perspectiveTransform(img_line, H)[0]
@@ -646,20 +646,20 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
         use_homograph = False
         if not homograph_obj:
             homograph_obj = SingletonHomographicMatrixModel.load()
-        fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, show=False)
+        fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, reference=homograph_obj.unit_distance,show=False)
         print(fno, duration)
         if not duration:
             duration = 0
-        video_obj.duration = round(duration,2) - 3
+        video_obj.duration = duration - 3
 
         original_name = os.path.basename(video_obj.file.name)
 
         final_output_path = f"temp_media_store/processed_{original_name}"
         if duration < 0.5:
             logger.info(f"[process_video_task] Detection failed retrying {petvideo_id}")
-            fno, duration, _ = detect_crossing_person_box(video_path, homograph_obj.end_pixel, show=False)
+            fno, duration, _ = detect_crossing_person_box(video_path, homograph_obj.end_pixel, show=False, reference=homograph_obj.unit_distance)
             if duration and duration > 1:
-                video_obj.duration = round(duration, 2) - 3.5
+                video_obj.duration = duration - 3.5
                 pass
             else:
                 with open(video_path, 'rb') as f:
@@ -675,7 +675,7 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
                     os.remove(file_path)
                 logger.info(f"[process_video_task] Detection failed {petvideo_id}")
                 return
-        video_obj.distance = 15.0
+        video_obj.distance = homograph_obj.unit_distance
         video_obj.is_video_processed = True
         video_obj.progress = 100
         subprocess.run([
