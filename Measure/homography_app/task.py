@@ -559,7 +559,8 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
             cv2.circle(frame, trajectory[traj_cnt], 20, (0, 255, 0), 2)
             traj_cnt += 1
-            cv2.line(frame, trajectory[start], trajectory[end], (0, 0, 0), 2)
+            if homograph_obj and homograph_obj.origin_x != 0 and homograph_obj != 0:
+                cv2.line(frame, [homograph_obj.origin_x, homograph_obj.origin_y], trajectory[end], (0, 0, 0), 2)
 
             # for i, (x, y) in enumerate(scale_img):
             #     if 0 <= x < width and 0 <= y < height:
