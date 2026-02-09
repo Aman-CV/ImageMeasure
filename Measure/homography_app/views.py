@@ -407,6 +407,7 @@ def upload_calibration_video(request):
                 (233, 0, 2),
                 1
             )
+        cv2.imwrite('media/cal2.jpg', frame)
         _, buffer = cv2.imencode('.jpg', frame)
         if homography_obj.file:
             homography_obj.file.delete(save=False)
