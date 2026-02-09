@@ -650,7 +650,7 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
         print(fno, duration)
         if not duration:
             duration = 0
-        video_obj.duration = duration - 3
+        video_obj.duration = duration - 3.5
 
         original_name = os.path.basename(video_obj.file.name)
 
