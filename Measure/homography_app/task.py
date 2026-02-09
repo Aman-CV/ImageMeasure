@@ -228,7 +228,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt2)
                 rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
             if use_homograph and rp1 and rp2:
-                distance = np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2)
+                distance = np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2) - 6.0
             #----#
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
