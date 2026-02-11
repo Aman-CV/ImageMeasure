@@ -91,7 +91,7 @@ def analyze_positions(positions):
 
 
 
-def get_first_bounce_frame_MOG(inp):
+def get_first_bounce_frame_MOG(inp, start_cutoff=0.25):
     cap = cv2.VideoCapture(inp)
     fps = cap.get(cv2.CAP_PROP_FPS)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -113,7 +113,7 @@ def get_first_bounce_frame_MOG(inp):
 
         frame_no += 1
         frame = cv2.resize(frame0, (1280, 720))
-        frame[:, :int(0.25 * frame.shape[1])] = 0
+        frame[:, :int(start_cutoff * frame.shape[1])] = 0
 
         fgmask = fgbg.apply(frame)
 

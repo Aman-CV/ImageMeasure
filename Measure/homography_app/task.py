@@ -114,9 +114,16 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     try:
         video_obj.is_video_processed = False
         video_obj.progress = 0
+        homograph_obj = CalibrationDataModel.objects.filter(
+            assessment_id=assessment_id,
+            test_id=test_id
+        ).first()
+        use_homograph = homograph_obj.use_homograph if homograph_obj else False
+        if not homograph_obj:
+            homograph_obj = SingletonHomographicMatrixModel.load()
 
-
-        cx, cy, cf = get_first_bounce_frame_MOG(video_path)
+        cx, cy, cf = get_first_bounce_frame_MOG(video_path,
+                    start_cutoff=(homograph_obj.start_pixel + 10.0)/1280.0 if homograph_obj.start_pixel !=0 else 0.25)
         if cx is None or cy is None:
             logger.error(f"[process_sit_and_throw] Error in detecting ball: {petvideo_id}")
             video_obj.distance = 0
@@ -125,13 +132,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
             video_obj.save()
             return
         print("s", cx, cy, cf)
-        homograph_obj = CalibrationDataModel.objects.filter(
-            assessment_id=assessment_id,
-            test_id=test_id
-        ).first()
-        use_homograph = homograph_obj.use_homograph if homograph_obj else False
-        if not homograph_obj:
-            homograph_obj = SingletonHomographicMatrixModel.load()
+
         distance = homograph_obj.unit_distance *  abs(cx - homograph_obj.start_pixel) / abs(homograph_obj.start_pixel - homograph_obj.end_pixel)
         rp1 = None
         pt1 = [cx, cy]
@@ -534,7 +535,8 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, origin)
         if rp1 and rp2 and use_homograph:
             distance_ft = np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2)
-        pt2[1] = pt1[1]
+        if homograph_obj.origin_y and homograph_obj.origin_y != 0:
+            pt2[1] = homograph_obj.origin_y
         # img_line = np.array([[trajectory[start], trajectory[end]]], dtype=np.float32)
         # world_line = cv2.perspectiveTransform(img_line, H)[0]
         # p1, p2 = world_line

@@ -73,6 +73,7 @@ def upload_video(request):
                 'duration': round(duration / 1000, 3),
                 'progress': 0 if to_be_processed else 100,
                 'to_be_processed': to_be_processed,
+                'is_video_processed': False if to_be_processed else True
             }
         )
         ext = os.path.splitext(video.name)[1].lower()
@@ -209,7 +210,7 @@ def upload_calibration_video(request):
         frame = cv2.resize(frame, (1280, 720))
         # if test_id == "vPbXoPK4":
         #     frame = stretch_contrast(frame)
-        if not use_sam_homograph and (test_id == "BwbJyXKl" or test_id == "G6bWk0bW" or test_id == "vPbXoPK4" or test_id == "lzb1PEKm"):
+        if not use_sam_homograph and (test_id == "Vnb7E6L6" or  test_id=="VpKl80KM" or test_id == "BwbJyXKl" or test_id == "G6bWk0bW" or test_id == "vPbXoPK4" or test_id == "lzb1PEKm"):
             singleton = SingletonHomographicMatrixModel.load()
             h, w = frame.shape[:2]
 
