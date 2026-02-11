@@ -127,6 +127,7 @@ def detect_crossing_rightmost_ankle(
 
                 cap.release()
                 cv2.destroyAllWindows()
+                out.release()
                 return frame_number, time_seconds, output_image_path
 
             prev_x = x_ankle
@@ -269,6 +270,7 @@ def detect_crossing_person_box(
 
                 cap.release()
                 cv2.destroyAllWindows()
+                out.release()
                 return frame_number, time_seconds, output_image_path
 
             prev_x = x_pos
@@ -283,6 +285,144 @@ def detect_crossing_person_box(
     out.release()
     cv2.destroyAllWindows()
     return None, None, None
+
+
+def detect_crossing_person_box_reverse_nobuffer(
+    video_path,
+    x_B,
+    output_image_path="motion_output.jpg",
+    resize_width=1280,
+    resize_height=720,
+    conf=0.2,
+    show=False,
+):
+    model = YOLO("yolov8m.pt")
+    cap = cv2.VideoCapture(video_path)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    target_id = None
+    prev_x = None
+
+    for idx in range(total_frames - 1, -1, -1):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if not ret:
+            continue
+
+        frame = cv2.resize(frame, (resize_width, resize_height))
+        frame_number = idx + 1
+        current_time = frame_number / fps
+
+        results = model.track(
+            frame,
+            persist=True,
+            conf=conf,
+            classes=[0],
+            verbose=False
+        )
+
+        r = results[0]
+
+        if r.boxes is None or r.boxes.id is None:
+            continue
+
+        ids = r.boxes.id.cpu().numpy().astype(int)
+        boxes = r.boxes.xyxy.cpu().numpy()
+
+        if target_id is None:
+            max_x = 100000
+            for box, track_id in zip(boxes, ids):
+                x1, y1, x2, y2 = box
+                x_pos = x1 + 0.75 * (x2 - x1)
+
+                if x_pos < max_x:
+                    max_x = x_pos
+                    target_id = track_id
+                    prev_x = x_pos
+
+        for box, track_id in zip(boxes, ids):
+            if track_id != target_id:
+                continue
+
+            x1, y1, x2, y2 = box
+            x_pos = x1 + 0.75 * (x2 - x1)
+            y_pos = y2
+
+            # visualization
+            cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
+            cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+
+            # reverse crossing check
+            if prev_x is not None and prev_x > x_B >= x_pos:
+                cv2.imwrite(output_image_path, frame)
+                cap.release()
+                cv2.destroyAllWindows()
+                frame_number = frame_number - 1
+                current_time = frame_number / fps
+                return frame_number, current_time, output_image_path
+
+            prev_x = x_pos
+
+        if show:
+            cv2.imshow("Reverse Processing", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+
+    cap.release()
+    cv2.destroyAllWindows()
+    return None, None, None
+
+def write_video_until_frame(
+    video_path,
+    output_path="motion_output.mp4",
+    end_frame_idx=None,  # None = write full video
+    resize_width=1280,
+    resize_height=720,
+    x_B=1200,
+    duration=0.,
+    reference=15.,
+):
+    cap = cv2.VideoCapture(video_path)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    w = resize_width
+    h = resize_height
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+
+    frame_idx = 0
+    print(x_B, reference, duration)
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame = cv2.resize(frame, (w, h))
+        cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+
+        if duration > 0.5:
+            speed_mps = reference / duration
+            cv2.putText(
+            frame,
+            f"Speed: {100 / speed_mps:.2f} s/100m",
+            (30, 60),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            (0, 255, 255),
+            2)
+
+        out.write(frame)
+
+        if end_frame_idx is not None and frame_idx >= end_frame_idx:
+            break
+
+        frame_idx += 1
+
+    cap.release()
+    out.release()
 
 
 if __name__ == "__main__":

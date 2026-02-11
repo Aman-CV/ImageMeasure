@@ -65,7 +65,7 @@ class PetVideos(models.Model):
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
             )
-        elif self.test_id in ("lzb1PEKm", "15run"):
+        elif self.test_id in ("lzb1PEKm", "Vnb7E6L6", "VpKl80KM" ,"15run"):
             return process_15m_dash(self.id, test_id=self.test_id,assessment_id=self.assessment_id)
 
         elif self.test_id in ("vmK617LE", "plank"):

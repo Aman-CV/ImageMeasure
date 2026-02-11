@@ -126,7 +126,7 @@ def upload_video(request):
             process_sit_and_throw(obj.id, test_id=test_id, assessment_id =assessment_id)
         elif test_id == "vPbXoPK4":
             process_sit_and_reach(obj.id, test_id=test_id, assessment_id=assessment_id)
-        elif test_id == "lzb1PEKm":
+        elif test_id == "lzb1PEKm" or test_id == "Vnb7E6L6" or  test_id=="VpKl80KM":
             process_15m_dash(obj.id,test_id=test_id,assessment_id=assessment_id)
         elif test_id == "vmK617LE":
             process_plank(obj.id, test_id=test_id, assessment_id=assessment_id)

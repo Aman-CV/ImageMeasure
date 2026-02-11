@@ -6,9 +6,11 @@ from django.core.files import File
 import cv2
 import json
 import numpy as np
+from polars.selectors import duration
 from sympy.codegen.scipy_nodes import powm1
 
-from .checkpoint_crossing import detect_crossing_rightmost_ankle, detect_crossing_person_box
+from .checkpoint_crossing import detect_crossing_rightmost_ankle, detect_crossing_person_box, \
+    detect_crossing_person_box_reverse_nobuffer, write_video_until_frame
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     distance_from_homography, get_flat_start, \
@@ -606,6 +608,8 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
 
 @background(schedule=0, remove_existing_tasks=True)
 def process_15m_dash(petvideo_id, test_id, assessment_id):
+    process_ttest_6x15_dash(petvideo_id, test_id, assessment_id)
+    return
     logger.info(f"[process_video_task] STARTED TEST/ ASSESSMENT ID: {petvideo_id}")
     if test_id == "" or assessment_id == "":
         logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
@@ -772,6 +776,110 @@ def process_plank(petvideo_id, test_id, assessment_id):
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id,
                        vurl=video_obj.processed_file.url)
+        logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
+
+    except Exception as e:
+        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+
+
+
+@background(schedule=0, remove_existing_tasks=True)
+def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
+    logger.info(f"[process_video_task] STARTED TEST (runs) / ASSESSMENT ID: {petvideo_id}")
+    if test_id == "" or assessment_id == "":
+        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
+        return
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        return
+    # if not video_obj.to_be_processed:
+    #     with open(video_obj.file.path, 'rb') as f:
+    #         video_obj.is_video_processed = True
+    #         video_obj.progress = 100
+    #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
+    #     return
+    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+    video_path = os.path.join(
+        settings.TEMP_VIDEO_STORAGE,
+        f"videot_{petvideo_id}{ext}"
+    )
+    if not os.path.exists(video_path):
+        download_and_save_video(video_obj)
+    if video_obj.processed_file:
+        video_obj.processed_file.delete(save=False)
+        video_obj.processed_file = None
+    #with open(video_path, 'rb') as f:
+    #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+    output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
+    os.makedirs(output_dir, exist_ok=True)
+    try:
+        video_obj.is_video_processed = False
+        video_obj.progress = 0
+        homograph_obj = CalibrationDataModel.objects.filter(
+            assessment_id=assessment_id,
+            test_id=test_id
+        ).first()
+        use_homograph = False
+        if not homograph_obj:
+            homograph_obj = SingletonHomographicMatrixModel.load()
+        #fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, reference=homograph_obj.unit_distance,show=False)
+
+        duration = 0
+        video_obj.duration = duration - 3.5
+
+        original_name = os.path.basename(video_obj.file.name)
+
+        final_output_path = f"temp_media_store/processed_{original_name}"
+        if duration < 0.5:
+            logger.info(f"[process_video_task] Detection started {petvideo_id}")
+            fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, homograph_obj.end_pixel, show=False)
+
+            if duration and duration > 1:
+                video_obj.duration = duration - 3.5
+                write_video_until_frame(video_path, duration=video_obj.duration,end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance)
+                pass
+            else:
+                with open(video_path, 'rb') as f:
+                    video_obj.is_video_processed = True
+                    video_obj.progress = 100
+                    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
+                ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+                file_path = os.path.join(
+                    settings.TEMP_VIDEO_STORAGE,
+                    f"videot_{petvideo_id}{ext}"
+                )
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                logger.info(f"[process_video_task] Detection failed {petvideo_id}")
+                return
+        video_obj.distance = homograph_obj.unit_distance
+        video_obj.is_video_processed = True
+        video_obj.progress = 100
+        subprocess.run([
+            'ffmpeg', '-i', "motion_output.mp4",
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+            '-c:a', 'aac', '-movflags', '+faststart', '-y',
+            final_output_path
+        ], check=True)
+
+        with open(final_output_path, 'rb') as f:
+            video_obj.processed_file.save(original_name, File(f), save=False)
+        for path in [final_output_path]:
+            if os.path.exists(path):
+                os.remove(path)
+        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+        file_path = os.path.join(
+            settings.TEMP_VIDEO_STORAGE,
+            f"videot_{petvideo_id}{ext}"
+        )
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        video_obj.save()
+        test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
 
     except Exception as e:
