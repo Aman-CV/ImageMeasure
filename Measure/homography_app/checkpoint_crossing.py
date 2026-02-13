@@ -318,7 +318,6 @@ def detect_crossing_person_box_reverse_nobuffer(
             video_obj.save(update_fields=["progress"])
         frame = cv2.resize(frame, (resize_width, resize_height))
         frame_number = idx + 1
-        current_time = frame_number / fps
 
         results = model.track(
             frame,
@@ -340,7 +339,7 @@ def detect_crossing_person_box_reverse_nobuffer(
             max_x = 100000
             for box, track_id in zip(boxes, ids):
                 x1, y1, x2, y2 = box
-                x_pos = x1 + 0.75 * (x2 - x1)
+                x_pos = x1 + 0.5 * (x2 - x1)
 
                 if x_pos < max_x:
                     max_x = x_pos
@@ -352,18 +351,13 @@ def detect_crossing_person_box_reverse_nobuffer(
                 continue
 
             x1, y1, x2, y2 = box
-            x_pos = x1 + 0.75 * (x2 - x1)
+            x_pos = x1 + 0.5 * (x2 - x1)
             y_pos = y2
 
             # visualization
             cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
             cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-
-            # reverse crossing check
-            if prev_x is not None and (
-                    (prev_x < x_pos <= x_B) or
-                    (prev_x > x_pos >= x_B)
-            ):
+            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0:
                 cv2.imwrite(output_image_path, frame)
                 cap.release()
                 cv2.destroyAllWindows()
@@ -402,7 +396,6 @@ def write_video_until_frame(
     out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
     frame_idx = 0
-    print(x_B, reference, duration)
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -415,7 +408,7 @@ def write_video_until_frame(
             speed_mps = reference / duration
             cv2.putText(
             frame,
-            f"Speed: {100 / speed_mps:.2f} s/100m",
+            f"Speed: {100 / speed_mps:.2f} s/100m @ frame no : {end_frame_idx}",
             (30, 60),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.0,
@@ -433,18 +426,9 @@ def write_video_until_frame(
     out.release()
 
 
-if __name__ == "__main__":
-    frame_id, time_sec, img_path = detect_crossing_person_box(
-        video_path="/Users/notcamelcase/PycharmProjects/MyMacSpace/nttes/thistr.mp4",
-        x_B=1172,
-        show=True
-    )
+# if __name__ == "__main__":
+#     video_path = "/Users/notcamelcase/PycharmProjects/ImageMeasure/Measure/temp_media_store/thissss.mp4"
+#
+#     fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 1223, show=True,
+#                                                                    video_obj=None)
 
-    print(frame_id, time_sec, img_path)
-
-    a, b, c = detect_crossing_rightmost_ankle(
-    video_path="/Users/notcamelcase/PycharmProjects/MyMacSpace/nttes/thistr.mp4",
-    x_B=1129,
-    show=True
-    )
-    print(a, b, c)

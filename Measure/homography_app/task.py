@@ -836,10 +836,10 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         if duration < 0.5:
             logger.info(f"[process_video_task] Detection started {petvideo_id}")
             fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, homograph_obj.end_pixel, show=False, video_obj=video_obj)
-
+            print(fno, "Stop frame")
             if duration and duration > 1:
                 video_obj.duration = duration - 3.5
-                write_video_until_frame(video_path, duration=video_obj.duration,end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance)
+                write_video_until_frame(video_path, duration=-3.5 + duration, end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance)
                 pass
             else:
                 with open(video_path, 'rb') as f:
