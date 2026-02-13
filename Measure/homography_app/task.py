@@ -784,8 +784,6 @@ def process_plank(petvideo_id, test_id, assessment_id):
         logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
 
 
-
-@background(schedule=0, remove_existing_tasks=True)
 def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
     logger.info(f"[process_video_task] STARTED TEST (runs) / ASSESSMENT ID: {petvideo_id}")
     if test_id == "" or assessment_id == "":
