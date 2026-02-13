@@ -9,6 +9,7 @@ from django.core.files.base import ContentFile
 import cv2
 import numpy as np
 import time
+from django.core.files import File
 from sklearn.utils import deprecated
 import tempfile
 from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_points_anticlockwise, \
@@ -60,58 +61,100 @@ def upload_video(request):
         os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
 
 
+        if test_id == "vmK617LE":
+            if request.method == 'POST' and video:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_input:
+                    for chunk in video.chunks():
+                        temp_input.write(chunk)
+                    temp_input_path = temp_input.name
 
-        obj, created = PetVideos.objects.update_or_create(
-            participant_id=participant_id,
-            test_id=test_id,
-            assessment_id=assessment_id,
-            defaults={
-                'name': video.name,
-                'file': video,
-                'participant_name': participant_name,
-                'pet_type': pet_type,
-                'duration': round(duration / 1000, 3),
-                'progress': 0 if to_be_processed else 100,
-                'to_be_processed': to_be_processed,
-                'is_video_processed': False if to_be_processed else True
-            }
-        )
-        ext = os.path.splitext(video.name)[1].lower()
-        raw_path = os.path.join(
-            settings.TEMP_VIDEO_STORAGE,
-            f"videot_{obj.id}_raw{ext}"
-        )
+                temp_output_path = temp_input_path.replace(".mp4", "_1fps.mp4")
 
-        print(f"Debug: saving raw video → {raw_path}")
+                command = [
+                    "ffmpeg",
+                    "-y",
+                    "-i", temp_input_path,
+                    "-filter:v", "fps=1",
+                    "-c:v", "libx264",
+                    "-preset", "fast",
+                    "-crf", "23",
+                    temp_output_path
+                ]
 
-        with open(raw_path, "wb") as destination:
-            for chunk in video.chunks():
-                destination.write(chunk)
-            destination.flush()
-            os.fsync(destination.fileno())
+                subprocess.run(command, check=True)
 
-        print("Raw video size:", os.path.getsize(raw_path))
-        final_path = os.path.join(
-            settings.TEMP_VIDEO_STORAGE,
-            f"videot_{obj.id}.mp4"
-        )
+                with open(temp_output_path, 'rb') as f:
+                    django_file = File(f)
 
-        try:
-            subprocess.run([
-                'ffmpeg', '-i', raw_path,
-                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-                '-c:a', 'aac', '-movflags', '+faststart', '-y',
-                final_path
-            ], check=True)
+                    obj, created = PetVideos.objects.update_or_create(
+                        participant_id=participant_id,
+                        test_id=test_id,
+                        assessment_id=assessment_id,
+                        defaults={
+                            'name': video.name,
+                            'file': django_file,
+                            'participant_name': participant_name,
+                            'pet_type': pet_type,
+                            'duration': round(duration / 1000, 3),
+                            'progress': 0 if to_be_processed else 100,
+                            'to_be_processed': to_be_processed,
+                            'is_video_processed': False if to_be_processed else True
+                        }
+                    )
 
+                os.remove(temp_input_path)
+                os.remove(temp_output_path)
+        else:
+            obj, created = PetVideos.objects.update_or_create(
+                participant_id=participant_id,
+                test_id=test_id,
+                assessment_id=assessment_id,
+                defaults={
+                    'name': video.name,
+                    'file': video,
+                    'participant_name': participant_name,
+                    'pet_type': pet_type,
+                    'duration': round(duration / 1000, 3),
+                    'progress': 0 if to_be_processed else 100,
+                    'to_be_processed': to_be_processed,
+                    'is_video_processed': False if to_be_processed else True
+                }
+            )
+            ext = os.path.splitext(video.name)[1].lower()
+            raw_path = os.path.join(
+                settings.TEMP_VIDEO_STORAGE,
+                f"videot_{obj.id}_raw{ext}"
+            )
 
-            if os.path.exists(raw_path):
-                os.remove(raw_path)
-                print("Deleted raw upload:", raw_path)
+            print(f"Debug: saving raw video → {raw_path}")
 
-        except subprocess.CalledProcessError as e:
-            print("FFmpeg failed. Keeping raw file for debugging.")
-            raise e
+            with open(raw_path, "wb") as destination:
+                for chunk in video.chunks():
+                    destination.write(chunk)
+                destination.flush()
+                os.fsync(destination.fileno())
+
+            print("Raw video size:", os.path.getsize(raw_path))
+            final_path = os.path.join(
+                settings.TEMP_VIDEO_STORAGE,
+                f"videot_{obj.id}.mp4"
+            )
+
+            try:
+                subprocess.run([
+                    'ffmpeg', '-i', raw_path,
+                    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+                    '-c:a', 'aac', '-movflags', '+faststart', '-y',
+                    final_path
+                ], check=True)
+
+                if os.path.exists(raw_path):
+                    os.remove(raw_path)
+                    print("Deleted raw upload:", raw_path)
+
+            except subprocess.CalledProcessError as e:
+                print("FFmpeg failed. Keeping raw file for debugging.")
+                raise e
 
         # ext = os.path.splitext(video.name)[1]
         # file_path = os.path.join(

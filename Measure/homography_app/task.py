@@ -714,7 +714,7 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
 
 @background(schedule=0, remove_existing_tasks=True)
 def process_plank(petvideo_id, test_id, assessment_id):
-    logger.info(f"[process_video_task] STARTED TEST/ ASSESSMENT ID: {petvideo_id}")
+    logger.info(f"[process_video_task] STARTED PLANK/ ASSESSMENT ID: {petvideo_id}")
     if test_id == "" or assessment_id == "":
         logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
         return
