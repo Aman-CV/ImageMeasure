@@ -336,15 +336,21 @@ def detect_crossing_person_box_reverse_nobuffer(
         boxes = r.boxes.xyxy.cpu().numpy()
 
         if target_id is None:
-            max_x = 100000
+            tf = x_B < 600
+            max_x = 100000 if tf else -1
             for box, track_id in zip(boxes, ids):
                 x1, y1, x2, y2 = box
                 x_pos = x1 + 0.5 * (x2 - x1)
-
-                if x_pos < max_x:
-                    max_x = x_pos
-                    target_id = track_id
-                    prev_x = x_pos
+                if tf:
+                    if x_pos < max_x:
+                        max_x = x_pos
+                        target_id = track_id
+                        prev_x = x_pos
+                else:
+                    if x_pos > max_x:
+                        max_x = x_pos
+                        target_id = track_id
+                        prev_x = x_pos
 
         for box, track_id in zip(boxes, ids):
             if track_id != target_id:
@@ -408,7 +414,7 @@ def write_video_until_frame(
             speed_mps = reference / duration
             cv2.putText(
             frame,
-            f"Speed: {100 / speed_mps:.2f} s/100m @ frame no : {end_frame_idx}",
+            f"Speed: {100 / speed_mps:.2f} s/100m @ {round(duration,3)}s",
             (30, 60),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.0,
