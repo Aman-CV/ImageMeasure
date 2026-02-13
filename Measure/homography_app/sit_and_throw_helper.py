@@ -91,12 +91,12 @@ def analyze_positions(positions):
 
 
 
-def get_first_bounce_frame_MOG(inp, start_cutoff=0.25):
+def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None):
     cap = cv2.VideoCapture(inp)
     fps = cap.get(cv2.CAP_PROP_FPS)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
+    tfc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter("motion_output.mp4", fourcc, fps, (w, h))
 
@@ -112,6 +112,9 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25):
             break
 
         frame_no += 1
+        if video_obj and int(frame_no / tfc * 100) % 10 == 0:
+            video_obj.progress = int(frame_no / tfc * 100)
+            video_obj.save(update_fields=["progress"])
         frame = cv2.resize(frame0, (1280, 720))
         frame[:, :int(start_cutoff * frame.shape[1])] = 0
 
@@ -163,6 +166,15 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25):
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
                 curr_pos = [frame_no, cx, cy]
         positions.append(curr_pos)
+        x = int(start_cutoff * frame.shape[1])
+
+        cv2.line(
+            frame,
+            (x, 0),
+            (x, frame.shape[0]),
+            (0, 255, 0),  # green color (BGR)
+            1  # thickness
+        )
         out.write(frame0)
 
 

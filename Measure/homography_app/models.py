@@ -43,7 +43,10 @@ class PetVideos(models.Model):
         Decides which processing function to call
         based on test_id.
         """
-
+        print("Retrying...")
+        self.is_video_processed = False if self.to_be_processed else True
+        self.progress = 0
+        self.save()
         from .task import (
             process_sit_and_reach,
             process_sit_and_throw,

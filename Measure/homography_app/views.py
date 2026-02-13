@@ -336,10 +336,7 @@ def upload_calibration_video(request):
             int(homograph_points["p1"]["fy"] * 720)
         ]
 
-        p2 = [
-            int(homograph_points["p2"]["fx"] * 1280),
-            int(homograph_points["p2"]["fy"] * 720)
-        ]
+
 
         selected_point = p1
         print(selected_point)

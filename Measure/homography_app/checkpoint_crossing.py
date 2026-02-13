@@ -295,6 +295,7 @@ def detect_crossing_person_box_reverse_nobuffer(
     resize_height=720,
     conf=0.2,
     show=False,
+    video_obj=None,
 ):
     model = YOLO("yolov8m.pt")
     cap = cv2.VideoCapture(video_path)
@@ -304,13 +305,17 @@ def detect_crossing_person_box_reverse_nobuffer(
 
     target_id = None
     prev_x = None
+    cfno = 0
 
     for idx in range(total_frames - 1, -1, -1):
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
         if not ret:
             continue
-
+        cfno += 1
+        if video_obj and int(cfno / total_frames * 100) % 10 == 0:
+            video_obj.progress = int(cfno / total_frames * 100)
+            video_obj.save(update_fields=["progress"])
         frame = cv2.resize(frame, (resize_width, resize_height))
         frame_number = idx + 1
         current_time = frame_number / fps

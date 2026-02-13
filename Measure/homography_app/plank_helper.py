@@ -74,7 +74,8 @@ def mark_right_side_pose(
     video_path,
     output_path="motion_output.mp4",
     model_path="yolov8m-pose.pt",
-    conf=0.25
+    conf=0.25,
+    video_obj=None
 ):
     model = YOLO(model_path)
 
@@ -84,14 +85,14 @@ def mark_right_side_pose(
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
-
+    tfc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     out = cv2.VideoWriter(
         output_path,
         cv2.VideoWriter_fourcc(*"mp4v"),
         fps,
         (w, h)
     )
-
+    frame_no = 0
     RIGHT_CHAIN = [
      #   ("head", 0),
         ("shoulder", 6),
@@ -106,6 +107,10 @@ def mark_right_side_pose(
             break
 
         results = model(frame, conf=conf, verbose=False)
+        frame_no += 1
+        if video_obj and int(frame_no / tfc * 100) % 10 == 0:
+            video_obj.progress = int(frame_no / tfc * 100)
+            video_obj.save(update_fields=["progress"])
 
         if results and results[0].keypoints is not None:
             kpts_all = results[0].keypoints.xy.cpu().numpy()  # (N,17,2)
