@@ -339,18 +339,21 @@ def detect_crossing_person_box_reverse_nobuffer(
 
         if target_id is None:
             min_dist = float("inf")
+            x_tresh = 0.17 * resize_width
 
             for box, track_id in zip(boxes, ids):
                 x1, y1, x2, y2 = box
 
                 x_pos = x1 + 0.5 * (x2 - x1)
-
                 dist = abs(x_pos - x_B)
 
-                if dist < min_dist:
+                if dist <= x_tresh and dist < min_dist:
                     min_dist = dist
                     target_id = track_id
                     prev_x = x_pos
+
+            if target_id is None:
+                continue
 
         for box, track_id in zip(boxes, ids):
             if track_id != target_id:
@@ -433,8 +436,8 @@ def write_video_until_frame(
 
 
 # if __name__ == "__main__":
-#     video_path = "/Users/notcamelcase/PycharmProjects/ImageMeasure/Measure/temp_media_store/thissss.mp4"
+#     video_path = "/Users/notcamelcase/Downloads/f15.mp4"
 #
-#     fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 1223, show=True,
+#     fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 1210, show=True,
 #                                                                    video_obj=None)
-
+#
