@@ -366,7 +366,7 @@ def detect_crossing_person_box_reverse_nobuffer(
             # visualization
             cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
             cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0:
+            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 10:
                 cv2.imwrite(output_image_path, frame)
                 cap.release()
                 cv2.destroyAllWindows()
