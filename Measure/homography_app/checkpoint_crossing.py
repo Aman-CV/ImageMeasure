@@ -335,22 +335,22 @@ def detect_crossing_person_box_reverse_nobuffer(
         ids = r.boxes.id.cpu().numpy().astype(int)
         boxes = r.boxes.xyxy.cpu().numpy()
 
+        import math
+
         if target_id is None:
-            tf = x_B < 600
-            max_x = 100000 if tf else -1
+            min_dist = float("inf")
+
             for box, track_id in zip(boxes, ids):
                 x1, y1, x2, y2 = box
+
                 x_pos = x1 + 0.5 * (x2 - x1)
-                if tf:
-                    if x_pos < max_x:
-                        max_x = x_pos
-                        target_id = track_id
-                        prev_x = x_pos
-                else:
-                    if x_pos > max_x:
-                        max_x = x_pos
-                        target_id = track_id
-                        prev_x = x_pos
+
+                dist = abs(x_pos - x_B)
+
+                if dist < min_dist:
+                    min_dist = dist
+                    target_id = track_id
+                    prev_x = x_pos
 
         for box, track_id in zip(boxes, ids):
             if track_id != target_id:
