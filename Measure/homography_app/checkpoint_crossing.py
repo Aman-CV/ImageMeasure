@@ -366,11 +366,11 @@ def detect_crossing_person_box_reverse_nobuffer(
             # visualization
             cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
             cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 20:
+            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 10:
                 cv2.imwrite(output_image_path, frame)
                 cap.release()
                 cv2.destroyAllWindows()
-                frame_number = frame_number - 1
+                frame_number = frame_number - 3
                 current_time = frame_number / fps
                 return frame_number, current_time, output_image_path
 
@@ -383,7 +383,7 @@ def detect_crossing_person_box_reverse_nobuffer(
 
     cap.release()
     cv2.destroyAllWindows()
-    return None, None, None
+    return int(total_frames - 3), (total_frames - 3.0) / fps, output_image_path
 
 def write_video_until_frame(
     video_path,
@@ -403,6 +403,7 @@ def write_video_until_frame(
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+
 
     frame_idx = 0
     while cap.isOpened():
@@ -436,8 +437,8 @@ def write_video_until_frame(
 
 
 if __name__ == "__main__":
-    video_path = "/Users/notcamelcase/Downloads/f15.mp4"
+    video_path = "/Users/notcamelcase/Downloads/ttes.mp4"
 
-    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 1223, show=True,
+    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 500, show=True,
                                                                    video_obj=None)
 
