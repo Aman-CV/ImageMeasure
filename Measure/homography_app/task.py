@@ -561,11 +561,18 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 overlay[:] = (0, 0, 160)  # BGR red
                 alpha = 0.3  # transparency factor
                 frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
-            cv2.circle(frame, trajectory[traj_cnt], 20, (0, 255, 0), 2)
+            #cv2.circle(frame, trajectory[traj_cnt], 20, (0, 255, 0), 2)
+
             traj_cnt += 1
             if homograph_obj and homograph_obj.origin_x != 0 and homograph_obj != 0:
-                cv2.line(frame, [homograph_obj.origin_x, homograph_obj.origin_y], trajectory[end], (0, 0, 0), 2)
-
+                if not success:
+                    cv2.line(frame, [homograph_obj.origin_x, homograph_obj.origin_y], trajectory[end], (0, 0, 0), 2)
+                elif  end and traj_cnt > end:
+                    cv2.line(frame, [homograph_obj.origin_x, homograph_obj.origin_y], trajectory[end], (0, 0, 0), 2)
+                    cv2.circle(frame, [homograph_obj.origin_x, homograph_obj.origin_y], 2, (0, 255, 0), 2)
+                    cv2.circle(frame, trajectory[end], 2, (0, 255, 0), 2)
+                    cv2.putText(frame, f"{round(distance_ft,3)}m", (homograph_obj.origin_x + 20, homograph_obj.origin_y - 6),
+                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
             # for i, (x, y) in enumerate(scale_img):
             #     if 0 <= x < width and 0 <= y < height:
             #         cv2.circle(frame, (x, y), 4, (0, 255, 0), -1)
