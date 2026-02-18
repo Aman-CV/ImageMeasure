@@ -383,7 +383,7 @@ def detect_crossing_person_box_reverse_nobuffer(
 
     cap.release()
     cv2.destroyAllWindows()
-    return int(total_frames - 3), (total_frames - 3.0) / fps, output_image_path
+    return int(total_frames - fps), (total_frames - fps) / fps, output_image_path
 
 def write_video_until_frame(
     video_path,
