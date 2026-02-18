@@ -167,7 +167,7 @@ def detect_carpet_segment_p(frame, p=0.75):
 
 
 
-def middle_finger_movement_distance(video_path, show=False, debug=True, video_obj=None):
+def middle_finger_movement_distance(video_path, show=False, debug=True, video_obj=None, output_pth="temp_output_path.mp4"):
     current_dir = Path(__file__).parent
     task_path = current_dir / "hand_landmarker.task"
     base_options = python.BaseOptions(
@@ -189,7 +189,7 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    out = cv2.VideoWriter("temp_output_path.mp4", fourcc, fps, (width, height))
+    out = cv2.VideoWriter(output_pth, fourcc, fps, (width, height))
     initial_point = None
     final_point = None
     tfc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))

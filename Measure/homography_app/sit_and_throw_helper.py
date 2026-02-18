@@ -91,14 +91,14 @@ def analyze_positions(positions):
 
 
 
-def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None):
+def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None, output_pth="motion_output.mp4"):
     cap = cv2.VideoCapture(inp)
     fps = cap.get(cv2.CAP_PROP_FPS)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     tfc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter("motion_output.mp4", fourcc, fps, (w, h))
+    out = cv2.VideoWriter(output_pth, fourcc, fps, (w, h))
 
     fgbg = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=200, detectShadows=True)
 

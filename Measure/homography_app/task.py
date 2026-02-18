@@ -121,9 +121,9 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         use_homograph = homograph_obj.use_homograph if homograph_obj else False
         if not homograph_obj:
             homograph_obj = SingletonHomographicMatrixModel.load()
-
+        opth = f"motion_output_{petvideo_id}.mp4"
         cx, cy, cf = get_first_bounce_frame_MOG(video_path,
-                    start_cutoff=(homograph_obj.origin_x + 10.0)/1280.0 if homograph_obj.start_pixel !=0 else 0.25, video_obj=video_obj)
+                    start_cutoff=(homograph_obj.origin_x + 10.0)/1280.0 if homograph_obj.start_pixel !=0 else 0.25, video_obj=video_obj, output_pth=opth)
         if cx is None or cy is None:
             logger.error(f"[process_sit_and_throw] Error in detecting ball: {petvideo_id}")
             video_obj.distance = 0
@@ -154,7 +154,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         final_output_path = f"temp_media_store/processed_{original_name}"
 
         subprocess.run([
-            'ffmpeg', '-i', "motion_output.mp4",
+            'ffmpeg', '-i', opth,
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
             '-c:a', 'aac', '-movflags', '+faststart', '-y',
             final_output_path
@@ -173,6 +173,8 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
 
         if os.path.exists(file_path):
             os.remove(file_path)
+        if os.path.exists(opth):
+            os.remove(opth)
         video_obj.save()
 
         test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
@@ -217,8 +219,8 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             use_homograph = homograph_obj.use_homograph if homograph_obj else False
             if not homograph_obj:
                 homograph_obj = SingletonHomographicMatrixModel.load()
-
-            distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj)
+            opth = f"motion_output_{petvideo_id}.mp4"
+            distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj, output_pth=opth)
 
             if not distance:
                 distance = 0
@@ -237,7 +239,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             final_output_path = f"temp_media_store/processed_{original_name}"
 
             subprocess.run([
-                'ffmpeg', '-i', "temp_output_path.mp4",
+                'ffmpeg', '-i', opth,
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
                 '-c:a', 'aac', '-movflags', '+faststart', '-y',
                 final_output_path
@@ -268,7 +270,8 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
 
             if os.path.exists(file_path):
                 os.remove(file_path)
-
+            if os.path.exists(opth):
+                os.remove(opth)
             test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
             logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
@@ -762,13 +765,14 @@ def process_plank(petvideo_id, test_id, assessment_id):
 
 
         original_name = os.path.basename(video_obj.file.name)
-        mark_right_side_pose(video_path, conf=0.2,video_obj=video_obj)
+        opth = f"motion_output_{petvideo_id}.mp4"
+        mark_right_side_pose(video_path, conf=0.2,video_obj=video_obj, output_path=opth)
         final_output_path = f"temp_media_store/processed_{original_name}"
         video_obj.distance = 0.0
         video_obj.is_video_processed = True
         video_obj.progress = 100
         subprocess.run([
-            'ffmpeg', '-i', "motion_output.mp4",
+            'ffmpeg', '-i', opth,
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
             '-c:a', 'aac', '-movflags', '+faststart', '-y',
             final_output_path
@@ -788,6 +792,8 @@ def process_plank(petvideo_id, test_id, assessment_id):
         if os.path.exists(file_path):
             os.remove(file_path)
         video_obj.save()
+        if os.path.exists(opth):
+            os.remove(opth)
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id,
                        vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
@@ -845,13 +851,14 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         original_name = os.path.basename(video_obj.file.name)
 
         final_output_path = f"temp_media_store/processed_{original_name}"
+        opth = f"motion_output_{petvideo_id}.mp4"
         if duration < 0.5:
             logger.info(f"[process_video_task] Detection started {petvideo_id}")
             fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, homograph_obj.end_pixel, show=False, video_obj=video_obj)
             print(fno, "Stop frame")
             if duration and duration > 1:
                 video_obj.duration = duration - 3.5
-                write_video_until_frame(video_path, duration=-3.5 + duration, end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance)
+                write_video_until_frame(video_path, duration=-3.5 + duration, end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance, output_path=opth)
                 pass
             else:
                 with open(video_path, 'rb') as f:
@@ -871,7 +878,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         video_obj.is_video_processed = True
         video_obj.progress = 100
         subprocess.run([
-            'ffmpeg', '-i', "motion_output.mp4",
+            'ffmpeg', '-i', opth,
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
             '-c:a', 'aac', '-movflags', '+faststart', '-y',
             final_output_path
@@ -890,6 +897,8 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
 
         if os.path.exists(file_path):
             os.remove(file_path)
+        if os.path.exists(opth):
+            os.remove(opth)
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
