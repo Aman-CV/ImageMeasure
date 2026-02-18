@@ -74,10 +74,13 @@ def upload_video(request):
                     "ffmpeg",
                     "-y",
                     "-i", temp_input_path,
-                    "-filter:v", "fps=1",
+                    "-vf", "fps=1",
+                    "-vsync", "vfr",
                     "-c:v", "libx264",
                     "-preset", "fast",
                     "-crf", "23",
+                    "-pix_fmt", "yuv420p",
+                    "-an",
                     temp_output_path
                 ]
 
