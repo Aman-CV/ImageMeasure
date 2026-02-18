@@ -769,7 +769,6 @@ def process_plank(petvideo_id, test_id, assessment_id):
         mark_right_side_pose(video_path, conf=0.2,video_obj=video_obj, output_path=opth)
         final_output_path = f"temp_media_store/processed_{original_name}"
         video_obj.distance = 0.0
-        video_obj.duration = video_obj.duration - 4.5
         video_obj.is_video_processed = True
         video_obj.progress = 100
         subprocess.run([
