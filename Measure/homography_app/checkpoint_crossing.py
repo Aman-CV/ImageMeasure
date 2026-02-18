@@ -297,7 +297,7 @@ def detect_crossing_person_box_reverse_nobuffer(
     show=False,
     video_obj=None,
 ):
-    model = YOLO("yolov8m.pt")
+    model = YOLO("yolov8x.pt")
     cap = cv2.VideoCapture(video_path)
 
     fps = cap.get(cv2.CAP_PROP_FPS)
