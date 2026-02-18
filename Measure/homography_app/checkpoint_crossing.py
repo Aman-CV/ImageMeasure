@@ -370,7 +370,7 @@ def detect_crossing_person_box_reverse_nobuffer(
                 cv2.imwrite(output_image_path, frame)
                 cap.release()
                 cv2.destroyAllWindows()
-                frame_number = frame_number - 3
+                frame_number = frame_number - 2
                 current_time = frame_number / fps
                 return frame_number, current_time, output_image_path
 
@@ -437,8 +437,8 @@ def write_video_until_frame(
 
 
 if __name__ == "__main__":
-    video_path = "/Users/notcamelcase/Downloads/ttes.mp4"
+    video_path = "/Users/notcamelcase/Downloads/f15.mp4"
 
-    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 500, show=True,
+    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 1220, show=True,
                                                                    video_obj=None)
 
