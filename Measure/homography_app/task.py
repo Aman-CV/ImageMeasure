@@ -237,6 +237,11 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                                                     origin)
             if use_homograph and rp1 and rp2:
                 distance = np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2)
+                if homograph_obj.origin_x < pt1[0]:
+                    distance = 15.0 + distance
+                else:
+                    distance = 15.0 - distance
+
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
 
