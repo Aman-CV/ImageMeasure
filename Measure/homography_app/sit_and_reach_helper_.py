@@ -167,7 +167,7 @@ def detect_carpet_segment_p(frame, p=0.75):
 
 
 
-def middle_finger_movement_distance(video_path, show=False, debug=True, video_obj=None, output_pth="temp_output_path.mp4"):
+def middle_finger_movement_distance(video_path, show=False, debug=True, video_obj=None, output_pth="temp_output_path.mp4", target_y=570):
     current_dir = Path(__file__).parent
     task_path = current_dir / "hand_landmarker.task"
     base_options = python.BaseOptions(
@@ -213,9 +213,14 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
         result = detector.detect(mp_image)
 
         if result.hand_landmarks:
-            rightmost_hand = max(
-                result.hand_landmarks,
-                key=lambda hand: hand[12].x  # middle finger tip x
+
+            hands = result.hand_landmarks
+
+            TARGET_y = target_y if target_y else 570
+
+            rightmost_hand = min(
+                hands,
+                key=lambda hand: abs((hand[12].y * h) - TARGET_y)
             )
 
             middle_tip = rightmost_hand[12]

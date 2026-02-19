@@ -220,7 +220,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             if not homograph_obj:
                 homograph_obj = SingletonHomographicMatrixModel.load()
             opth = f"motion_output_{petvideo_id}.mp4"
-            distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj, output_pth=opth)
+            distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj, output_pth=opth, target_y=homograph_obj.origin_y if homograph_obj.origin_y != 0 else 570)
 
             if not distance:
                 distance = 0
@@ -231,10 +231,12 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             rp2 = None
             if use_homograph:
                 rp2 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt2)
-                rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance, pt1)
+                if use_homograph and homograph_obj.origin_x != 0 and homograph_obj.origin_y != 0:
+                    origin = np.array([homograph_obj.origin_x, homograph_obj.origin_y])
+                    rp1 = image_point_to_real_point(homograph_obj.homography_points, homograph_obj.unit_distance,
+                                                    origin)
             if use_homograph and rp1 and rp2:
-                distance = np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2) - 6.0
-            #----#
+                distance = np.sqrt((rp2[0] - rp1[0]) ** 2 + (rp2[1] - rp1[1]) ** 2)
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
 
