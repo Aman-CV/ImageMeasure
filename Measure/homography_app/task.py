@@ -279,7 +279,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 os.remove(file_path)
             if os.path.exists(opth):
                 os.remove(opth)
-            #test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
+            test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
             logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
         except Exception as e:
