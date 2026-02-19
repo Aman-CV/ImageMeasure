@@ -167,7 +167,7 @@ def detect_carpet_segment_p(frame, p=0.75):
 
 
 
-def middle_finger_movement_distance(video_path, show=False, debug=True, video_obj=None, output_pth="temp_output_path.mp4", target_y=570):
+def middle_finger_movement_distance(video_path, show=False, debug=True, video_obj=None, output_pth="temp_output_path.mp4", target_y=None):
     current_dir = Path(__file__).parent
     task_path = current_dir / "hand_landmarker.task"
     base_options = python.BaseOptions(
@@ -215,8 +215,10 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
         if result.hand_landmarks:
 
             hands = result.hand_landmarks
+            TARGET_x, TARGET_y = None, 570
 
-            TARGET_y = target_y if target_y else 570
+            if target_y:
+                TARGET_x, TARGET_y = target_y[0], target_y[1]
 
             rightmost_hand = min(
                 hands,
@@ -233,16 +235,18 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
             final_point = (cx, cy)
 
             if show or debug:
-                cv2.circle(frame, (cx, cy), 10, (0, 0, 255), -1)
-                cv2.putText(
-                    frame,
-                    f"({cx},{cy})",
-                    (cx + 10, cy - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 0, 255),
-                    1
-                )
+#                cv2.circle(frame, (cx, cy), 10, (0, 0, 255), -1)
+                if TARGET_x:
+                    cv2.line(frame, (cx, cy), (TARGET_x, TARGET_y), (0, 255, 0), 2)
+                # cv2.putText(
+                #     frame,
+                #     f"({cx},{cy})",
+                #     (cx + 10, cy - 10),
+                #     cv2.FONT_HERSHEY_SIMPLEX,
+                #     0.5,
+                #     (0, 0, 255),
+                #     1
+                # )
         out.write(frame)
 
         if show:

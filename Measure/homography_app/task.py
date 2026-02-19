@@ -220,7 +220,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             if not homograph_obj:
                 homograph_obj = SingletonHomographicMatrixModel.load()
             opth = f"motion_output_{petvideo_id}.mp4"
-            distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj, output_pth=opth, target_y=homograph_obj.origin_y if homograph_obj.origin_y != 0 else 570)
+            distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj, output_pth=opth, target_y=[homograph_obj.origin_x, homograph_obj.origin_y] if homograph_obj.origin_y != 0 else None)
 
             if not distance:
                 distance = 0
@@ -279,7 +279,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 os.remove(file_path)
             if os.path.exists(opth):
                 os.remove(opth)
-            test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
+            #test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
             logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
         except Exception as e:
