@@ -235,9 +235,10 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
             final_point = (cx, cy)
 
             if show or debug:
-#                cv2.circle(frame, (cx, cy), 10, (0, 0, 255), -1)
+                cv2.circle(frame, (cx, cy), 2, (0, 0, 255), -1)
                 if TARGET_x:
-                    cv2.line(frame, (cx, cy), (TARGET_x, TARGET_y), (0, 255, 0), 2)
+                    pass
+                    #cv2.line(frame, (cx, cy), (TARGET_x, TARGET_y), (0, 255, 0), 2)
                 # cv2.putText(
                 #     frame,
                 #     f"({cx},{cy})",

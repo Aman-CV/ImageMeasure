@@ -412,7 +412,7 @@ def write_video_until_frame(
             break
 
         frame = cv2.resize(frame, (w, h))
-        cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+        #cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
 
         if duration > 0.5:
             speed_mps = reference / duration

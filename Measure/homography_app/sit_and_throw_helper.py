@@ -139,8 +139,8 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None, output_pth
                     cy = int((y1 + y2) / 2)
                     cv2.rectangle(frame0, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.circle(frame0, (cx, cy), 6, (255, 0, 255), -1)
-                    cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
+                    # cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
+                    #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
                     curr_pos = [frame_no, cx, cy]
                     detected = True
                     break
@@ -162,8 +162,8 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None, output_pth
                 cv2.circle(frame0, (cx, cy), 6, (0, 255, 255), -1)
                 cv2.putText(frame0, f"...", (x, y-3),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
-                cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
+                # cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
+                #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
                 curr_pos = [frame_no, cx, cy]
         positions.append(curr_pos)
         x = int(start_cutoff * frame.shape[1])
