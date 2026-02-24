@@ -338,7 +338,7 @@ def detect_crossing_person_box_reverse_nobuffer(
         import math
 
         if target_id is None:
-            min_dist = float("inf")
+            max_y2 = 0
             x_tresh = 0.17 * resize_width
 
             for box, track_id in zip(boxes, ids):
@@ -347,8 +347,8 @@ def detect_crossing_person_box_reverse_nobuffer(
                 x_pos = x1 + 0.5 * (x2 - x1)
                 dist = abs(x_pos - x_B)
 
-                if dist <= x_tresh and dist < min_dist:
-                    min_dist = dist
+                if dist <= x_tresh and y2 > max_y2:
+                    max_y2 = y2
                     target_id = track_id
                     prev_x = x_pos
 
