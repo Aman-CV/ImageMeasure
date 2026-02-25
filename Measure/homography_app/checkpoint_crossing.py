@@ -370,7 +370,7 @@ def detect_crossing_person_box_reverse_nobuffer(
                 cv2.imwrite(output_image_path, frame)
                 cap.release()
                 cv2.destroyAllWindows()
-                frame_number = frame_number - 2
+                frame_number = frame_number - 1
                 current_time = frame_number / fps
                 return frame_number, current_time, output_image_path
 
