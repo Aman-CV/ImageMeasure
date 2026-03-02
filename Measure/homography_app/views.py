@@ -69,13 +69,11 @@ def upload_video(request):
                     temp_input_path = temp_input.name
 
                 temp_output_path = temp_input_path.replace(".mp4", "_1fps.mp4")
-
                 command = [
                     "ffmpeg",
                     "-y",
                     "-i", temp_input_path,
-                    "-vf", "fps=1",
-                    "-vsync", "vfr",
+                    "-vf", "fps=1,setpts=N/30/TB",
                     "-c:v", "libx264",
                     "-preset", "fast",
                     "-crf", "23",
