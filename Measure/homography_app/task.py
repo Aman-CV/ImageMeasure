@@ -849,7 +849,9 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         ).first()
         use_homograph = False
         if not homograph_obj:
-            homograph_obj = SingletonHomographicMatrixModel.load()
+            logger.info(f"[process_video_task] Not calibrated {petvideo_id}")
+            return
+
         #fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, reference=homograph_obj.unit_distance,show=False)
 
         duration = 0
@@ -861,7 +863,10 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         opth = f"motion_output_{petvideo_id}.mp4"
         if duration < 0.5:
             logger.info(f"[process_video_task] Detection started {petvideo_id}")
-            fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, homograph_obj.end_pixel, show=False, video_obj=video_obj)
+            fpx = [homograph_obj.origin_x, homograph_obj.origin_y]
+            if homograph_obj.origin_x == 0 and homograph_obj == 0:
+                fpx = [homograph_obj.end_pixel, None]
+            fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, fpx, show=False, video_obj=video_obj)
             print(fno, "Stop frame")
             if duration and duration > 1:
                 video_obj.duration = duration - 3.5

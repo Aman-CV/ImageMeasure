@@ -225,7 +225,7 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
                 key=lambda hand: abs((hand[12].y * h) - TARGET_y)
             )
 
-            middle_tip = rightmost_hand[12]
+            middle_tip = max(rightmost_hand, key=lambda rh : rh.x * w)
             cx = int(middle_tip.x * w)
             cy = int(middle_tip.y * h)
 
@@ -237,8 +237,8 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
             if show or debug:
                 cv2.circle(frame, (cx, cy), 2, (0, 0, 255), -1)
                 if TARGET_x:
-                    pass
-                    #cv2.line(frame, (cx, cy), (TARGET_x, TARGET_y), (0, 255, 0), 2)
+                    if show:
+                        cv2.line(frame, (cx, cy), (TARGET_x, TARGET_y), (0, 255, 0), 2)
                 # cv2.putText(
                 #     frame,
                 #     f"({cx},{cy})",
@@ -268,3 +268,7 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
     )
 
     return distance, initial_point, final_point
+
+
+if __name__ == "__main__":
+    middle_finger_movement_distance("/Users/notcamelcase/Downloads/d8526171-9424-4920-9dcf-e68fcd107d94.mp4", show=True, target_y=[789, 487])

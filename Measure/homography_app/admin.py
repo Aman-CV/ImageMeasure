@@ -46,7 +46,14 @@ class PetVideosAdmin(admin.ModelAdmin):
 
         return redirect(request.META.get("HTTP_REFERER"))
 
-
+class CalibrationDataModelAdmin(admin.ModelAdmin):
+    list_display = (
+        "test_id",
+        "assessment_id",
+        "origin_x",
+        "origin_y",
+        "unit_distance",
+    )
 admin.site.register(PetVideos, PetVideosAdmin)
 admin.site.register(SingletonHomographicMatrixModel)
-admin.site.register(CalibrationDataModel)
+admin.site.register(CalibrationDataModel, CalibrationDataModelAdmin)

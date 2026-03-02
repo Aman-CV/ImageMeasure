@@ -289,7 +289,7 @@ def detect_crossing_person_box(
 
 def detect_crossing_person_box_reverse_nobuffer(
     video_path,
-    x_B,
+    x_BA,
     output_image_path="motion_output.jpg",
     resize_width=1280,
     resize_height=720,
@@ -306,7 +306,7 @@ def detect_crossing_person_box_reverse_nobuffer(
     target_id = None
     prev_x = None
     cfno = 0
-
+    x_B, y_pos = x_BA
     for idx in range(total_frames - 1, -1, -1):
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
@@ -340,14 +340,14 @@ def detect_crossing_person_box_reverse_nobuffer(
         if target_id is None:
             max_y2 = 0
             x_tresh = 0.17 * resize_width
-
+            y_tresh = 0.3 * resize_height
             for box, track_id in zip(boxes, ids):
                 x1, y1, x2, y2 = box
 
                 x_pos = x1 + 0.5 * (x2 - x1)
                 dist = abs(x_pos - x_B)
 
-                if dist <= x_tresh and y2 > max_y2:
+                if dist <= x_tresh and y2 > max_y2 and y2 > y_tresh:
                     max_y2 = y2
                     target_id = track_id
                     prev_x = x_pos

@@ -328,8 +328,7 @@ def upload_calibration_video(request):
 
 
             else:
-                cv2.line(frame, (x1, 0), (x1, h), (0, 255, 0), 2)
-                cv2.line(frame, (x2, 0), (x2, h), (0, 0, 255), 2)
+                cv2.line(frame, (int(origin_x * 1280), 0), (int(origin_x * 1280), h), (0, 255, 0), 2)
             cv2.imwrite("s.jpg", frame)
             _, buffer = cv2.imencode('.jpg', frame)
             # Replace frame
@@ -362,7 +361,9 @@ def upload_calibration_video(request):
                     'end_pixel' : max(x1, x2),
                     'unit_distance' : unit_distance,
                     'use_homograph': use_homograph,
-                    'homography_points' : homograph_points
+                    'homography_points' : homograph_points,
+                    'origin_x': int(origin_x * 1280),
+                    'origin_y': int(origin_y * 720)
                 }
             )
             return JsonResponse({
