@@ -260,7 +260,7 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
     cv2.destroyAllWindows()
 
     if initial_point is None or final_point is None:
-        return None
+        return None, None, None
 
     distance = np.sqrt(
         (final_point[0] - initial_point[0]) ** 2 +
