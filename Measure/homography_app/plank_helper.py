@@ -113,8 +113,7 @@ def mark_right_side_pose(
             video_obj.save(update_fields=["progress"])
 
         if results and results[0].keypoints is not None:
-            kpts_all = results[0].keypoints.xy.cpu().numpy()  # (N,17,2)
-
+            kpts_all = results[0].keypoints.xy.cpu().numpy()
             if len(kpts_all) > 0:
                 person = kpts_all[0]  # first detected person
 

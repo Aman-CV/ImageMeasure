@@ -335,8 +335,6 @@ def detect_crossing_person_box_reverse_nobuffer(
         ids = r.boxes.id.cpu().numpy().astype(int)
         boxes = r.boxes.xyxy.cpu().numpy()
 
-        import math
-
         if target_id is None:
             max_y2 = 0
             x_tresh = 0.17 * resize_width
@@ -360,13 +358,16 @@ def detect_crossing_person_box_reverse_nobuffer(
                 continue
 
             x1, y1, x2, y2 = box
-            x_pos = x1 + 0.5 * (x2 - x1)
+            towards_x1 = 0.9 if abs(x_B - x1) < abs(x_B - x2) else 0.1
+            x_pos = x1 + (1 - towards_x1) * (x2 - x1)
             y_pos = y2
 
             # visualization
+            cv2.circle(frame, (int(x1), int(y_pos)), 6, (0, 0, 255), -1)
+            cv2.circle(frame, (int(x2), int(y_pos)), 6, (255, 0, 0), -1)
             cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
             cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 10:
+            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 8:
                 cv2.imwrite(output_image_path, frame)
                 cap.release()
                 cv2.destroyAllWindows()
@@ -377,10 +378,10 @@ def detect_crossing_person_box_reverse_nobuffer(
             prev_x = x_pos
 
         if show:
+            cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
             cv2.imshow("Reverse Processing", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
-
     cap.release()
     cv2.destroyAllWindows()
     return int(total_frames - fps), (total_frames - fps) / fps, output_image_path
@@ -439,6 +440,6 @@ def write_video_until_frame(
 if __name__ == "__main__":
     video_path = "/Users/notcamelcase/Downloads/f15.mp4"
 
-    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, 1220, show=True,
+    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, [1100, 360], show=True,
                                                                    video_obj=None)
 

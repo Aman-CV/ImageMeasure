@@ -6,6 +6,7 @@ import uuid
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+from django.db import transaction
 
 
 
@@ -27,6 +28,7 @@ class PetVideos(models.Model):
     file = models.FileField(upload_to=file_name)
     distance = models.FloatField(default=0)
     duration = models.FloatField(default=0)
+    take_best = models.BooleanField(default=False)
     pet_type = models.CharField(max_length=32, default="STANDING_JUMP")
     processed_file = models.FileField(upload_to=processed_file_name, blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -37,6 +39,17 @@ class PetVideos(models.Model):
 
     def __str__(self):
         return self.name
+
+    def update_metrix(self, time, distance):
+        with transaction.atomic():
+            fresh = type(self).objects.select_for_update().get(pk=self.pk)
+
+            if fresh.take_best:
+                self.duration = min(time, fresh.duration)
+                self.distance = max(distance, fresh.distance)
+            else:
+                self.duration = time
+                self.distance = distance
 
     def run_processing(self):
         """

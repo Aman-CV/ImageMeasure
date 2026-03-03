@@ -57,7 +57,8 @@ def upload_video(request):
         enable_color_marker_tracking = request.POST.get('enable_color_marker_tracking', 'true').lower()
         enable_start_end_detector = enable_start_end_detector in ('true', '1', 'yes', 'on')
         enable_color_marker_tracking = enable_color_marker_tracking in ('true', '1', 'yes', 'on')
-
+        take_best = request.POST.get('take_best').lower()
+        take_best = take_best in ('true', '1', 'yes', 'on')
         os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
 
 
@@ -118,7 +119,8 @@ def upload_video(request):
                     'duration': round(duration / 1000, 3),
                     'progress': 0 if to_be_processed else 100,
                     'to_be_processed': to_be_processed,
-                    'is_video_processed': False if to_be_processed else True
+                    'is_video_processed': False if to_be_processed else True,
+                    'take_best': take_best
                 }
             )
             ext = os.path.splitext(video.name)[1].lower()
