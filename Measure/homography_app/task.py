@@ -148,7 +148,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
             distance = np.sqrt((rp1[0] - rp2[0]) ** 2 + (rp1[1] - rp2[1]) ** 2)
 
         # video_obj.distance = distance
-        video_obj.update_metrix(0, distance)
+        is_changed = video_obj.update_metrix(0, distance)
         video_obj.is_video_processed = True
         video_obj.progress = 100
         original_name = os.path.basename(video_obj.file.name)
@@ -161,9 +161,9 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
             '-c:a', 'aac', '-movflags', '+faststart', '-y',
             final_output_path
         ], check=True)
-
-        with open(final_output_path, 'rb') as f:
-            video_obj.processed_file.save(original_name, File(f), save=False)
+        if is_changed:
+            with open(final_output_path, 'rb') as f:
+                video_obj.processed_file.save(original_name, File(f), save=False)
         for path in [final_output_path]:
             if os.path.exists(path):
                 os.remove(path)
@@ -253,11 +253,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 final_output_path
             ], check=True)
 
-            with open(final_output_path, 'rb') as f:
-                video_obj.processed_file.save(original_name, File(f), save=False)
-            for path in [final_output_path]:
-                if os.path.exists(path):
-                    os.remove(path)
+
             #----#
             #with open(video_path, 'rb') as f:
             #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=False)
@@ -266,8 +262,15 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 logger.info(f"[process_video_task] Finger tip detection failed: {petvideo_id}")
             else:
                 print(distance)
+            is_changed = True
             if distance:
-                video_obj.update_metrix(0, distance)
+                is_changed = video_obj.update_metrix(0, distance)
+            if is_changed:
+                with open(final_output_path, 'rb') as f:
+                    video_obj.processed_file.save(original_name, File(f), save=False)
+            for path in [final_output_path]:
+                if os.path.exists(path):
+                    os.remove(path)
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.save()
@@ -354,8 +357,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                 final_output_path
             ], check=True)
 
-            with open(final_output_path, 'rb') as f:
-                video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
+
 
             if not distance:
                 logger.info(f"[process_video_task] All markers not detected: {petvideo_id}")
@@ -364,7 +366,10 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             # video_obj.distance = distance if distance else 0
             video_obj.is_video_processed = True
             video_obj.progress = 100
-            video_obj.update_metrix(0, distance if distance else 0)
+            is_changed = video_obj.update_metrix(0, distance if distance else 0)
+            if is_changed:
+                with open(final_output_path, 'rb') as f:
+                    video_obj.processed_file.save(f"processed_{original_name}", File(f), save=False)
             video_obj.save()
 
             for path in [temp_output_path, final_output_path]:
@@ -608,13 +613,15 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             final_output_path
         ], check=True)
 
-        with open(final_output_path, 'rb') as f:
-            video_obj.processed_file.save(original_name, File(f), save=False)
+
 
         # video_obj.distance = distance_ft
         video_obj.is_video_processed = True
         video_obj.progress = 100
-        video_obj.update_metrix(0, distance_ft)
+        is_changed = video_obj.update_metrix(0, distance_ft)
+        if is_changed:
+            with open(final_output_path, 'rb') as f:
+                video_obj.processed_file.save(original_name, File(f), save=False)
         video_obj.save()
         ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
         file_path = os.path.join(
@@ -863,6 +870,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
 
         final_output_path = f"temp_media_store/processed_{original_name}"
         opth = f"motion_output_{petvideo_id}.mp4"
+        is_changed = False
         if duration < 0.5:
             logger.info(f"[process_video_task] Detection started {petvideo_id}")
             fpx = [homograph_obj.origin_x, homograph_obj.origin_y]
@@ -872,7 +880,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
             print(fno, "Stop frame")
             if duration and duration > 1:
                 #video_obj.duration = duration - 3.5
-                video_obj.update_metrix(duration - 3.5, 0)
+                is_changed = video_obj.update_metrix(duration - 3.5, 0)
                 write_video_until_frame(video_path, duration=-3.5 + duration, end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance, output_path=opth)
                 pass
             else:
@@ -898,9 +906,9 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
             '-c:a', 'aac', '-movflags', '+faststart', '-y',
             final_output_path
         ], check=True)
-
-        with open(final_output_path, 'rb') as f:
-            video_obj.processed_file.save(original_name, File(f), save=False)
+        if is_changed:
+            with open(final_output_path, 'rb') as f:
+                video_obj.processed_file.save(original_name, File(f), save=False)
         for path in [final_output_path]:
             if os.path.exists(path):
                 os.remove(path)

@@ -47,9 +47,11 @@ class PetVideos(models.Model):
             if fresh.take_best:
                 self.duration = min(time, fresh.duration)
                 self.distance = max(distance, fresh.distance)
+                return True
             else:
                 self.duration = time
                 self.distance = distance
+                return False
 
     def run_processing(self):
         """
