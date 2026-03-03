@@ -45,8 +45,13 @@ class PetVideos(models.Model):
             fresh = type(self).objects.select_for_update().get(pk=self.pk)
 
             if fresh.take_best:
+                old_time = fresh.duration
+                old_distance = fresh.distance
                 self.duration = min(time, fresh.duration)
-                self.distance = max(distance, fresh.distance)
+                if distance:
+                    self.distance = max(distance, fresh.distance)
+                if self.duration == old_time and self.distance == old_distance:
+                    return False
                 return True
             else:
                 self.duration = time

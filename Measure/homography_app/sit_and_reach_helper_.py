@@ -271,4 +271,4 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
 
 
 if __name__ == "__main__":
-    middle_finger_movement_distance("/Users/notcamelcase/Downloads/d8526171-9424-4920-9dcf-e68fcd107d94.mp4", show=True, target_y=[789, 487])
+    middle_finger_movement_distance("/Users/notcamelcase/Downloads/thisss.mp4", show=True, target_y=[876, 567])
