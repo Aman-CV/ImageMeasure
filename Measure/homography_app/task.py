@@ -262,7 +262,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                 logger.info(f"[process_video_task] Finger tip detection failed: {petvideo_id}")
             else:
                 print(distance)
-            is_changed = True
+            is_changed = False
             if distance:
                 is_changed = video_obj.update_metrix(0, distance)
             if is_changed:
