@@ -359,7 +359,7 @@ def detect_crossing_person_box_reverse_nobuffer(
 
             x1, y1, x2, y2 = box
             towards_x1 = 0.9 if abs(x_B - x1) < abs(x_B - x2) else 0.1
-            x_pos = x1 + (1 - towards_x1) * (x2 - x1)
+            x_pos = x1 + (towards_x1) * (x2 - x1)
             y_pos = y2
 
             # visualization
