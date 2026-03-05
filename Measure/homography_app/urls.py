@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('', views.landing_page, name='landing_page'),
     path('upload_video/', views.upload_video, name='upload_video'), #upload video from app
     path('list_videos/', views.list_videos), # get all videos
     path('calibrate/',views.upload_calibration_video), #calibrate video and generate homo matrix

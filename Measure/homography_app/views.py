@@ -3,22 +3,21 @@ import os
 import subprocess
 from botocore.exceptions import ClientError
 from django.http import JsonResponse, FileResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 import cv2
 import numpy as np
 import time
 from django.core.files import File
-from sklearn.utils import deprecated
 import tempfile
-from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_points_anticlockwise, \
-    process_frame_for_color_centers, correct_white_balance, stretch_contrast, find_yellow_point_lab
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
-from .sit_and_reach_helper_ import detect_carpet_segment_p
-from .task import process_video_task, process_sit_and_throw, process_sit_and_reach, process_15m_dash, process_plank
 from django.conf import settings
 import base64
+
+# Keep HSV defaults local to avoid importing heavy helper modules at startup.
+DEFAULT_HSV = np.array([172, 180, 180], dtype=np.uint8)
+TOL_H, TOL_S, TOL_V = 20, 50, 50
 
 DEFAULT_HOMOGRAPH_POINTS = {
                 "p1": {"fx": None, "fy": None},
@@ -34,6 +33,10 @@ FALL_BACK = {
     'G6bWk0bW' : 1.4224
 }
 
+
+def landing_page(request):
+    return render(request, 'landing.html')
+
 @csrf_exempt
 def upload_video(request):
     """
@@ -42,6 +45,14 @@ def upload_video(request):
     program sends it to processing for distance calculations
     """
     if request.method == 'POST' and request.FILES.get('video'):
+        from .task import (
+            process_15m_dash,
+            process_plank,
+            process_sit_and_reach,
+            process_sit_and_throw,
+            process_video_task,
+        )
+
         video = request.FILES['video']
 
         # Get extra fields from POST
@@ -195,6 +206,14 @@ def upload_calibration_video(request):
     recieves a video , extract on frame from video and marks calibration points
     """
     if request.method == 'POST' and request.FILES.get('video'):
+        from .helper import (
+            correct_white_balance,
+            find_yellow_point_lab,
+            merge_close_points,
+            order_points_anticlockwise,
+            process_frame_for_color_centers,
+        )
+
         video_file = request.FILES['video']
         test_id = request.POST.get('test_id', "not_sit_and_reach")
         unit_distance = float(request.POST.get('square_size', 2.5908))
@@ -504,6 +523,8 @@ def upload_calibration_video(request):
 
 @csrf_exempt
 def upload_calibration_video_deprecated(request):
+    from .helper import merge_close_points, order_points_anticlockwise
+
     if request.method == 'POST' and request.FILES.get('video'):
         video_file = request.FILES['video']
         unit_distance = float(request.POST.get('square_size', 0.984252))

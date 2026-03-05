@@ -438,8 +438,9 @@ def write_video_until_frame(
 
 
 if __name__ == "__main__":
-    video_path = "/Users/notcamelcase/Downloads/f15.mp4"
+    video_path = "this.mp4"
 
-    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, [1100, 360], show=True,
+    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, [500, 360], show=True,
                                                                    video_obj=None)
 
+    print(f"Crossing frame: {fno}, duration: {duration - 3.5:.2f} seconds")
