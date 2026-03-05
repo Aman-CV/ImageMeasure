@@ -31,11 +31,12 @@
         radial-gradient(circle at 20% 15%, var(--bg-3), transparent 35%),
         radial-gradient(circle at 80% 85%, #c6e5ff, transparent 30%),
         linear-gradient(135deg, var(--bg-1), var(--bg-2));
-      overflow: hidden;
+      overflow: auto;
+      padding: 24px 0;
     }
 
     .wrap {
-      width: min(92vw, 560px);
+      width: min(94vw, 980px);
       text-align: center;
       padding: 40px 28px;
       background: color-mix(in srgb, var(--card) 85%, transparent);
@@ -82,6 +83,55 @@
       transform: translateY(0);
     }
 
+    .tests {
+      margin-top: 34px;
+      text-align: left;
+    }
+
+    .tests h2 {
+      margin: 0 0 14px;
+      font-size: clamp(1.4rem, 2.8vw, 1.8rem);
+      text-align: center;
+    }
+
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .test-card {
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(15, 118, 110, 0.15);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .test-card h3 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+    }
+
+    .test-card p {
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+      opacity: 0.95;
+      line-height: 1.4;
+    }
+
+    .test-card video {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+      display: block;
+    }
+
+    @media (max-width: 760px) {
+      .test-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @keyframes fadeInUp {
       from {
         opacity: 0;
@@ -99,6 +149,67 @@
     <h1>ImageMeasure</h1>
     <p>Management entry point for the homography app.</p>
     <a class="admin-btn" href="/admin/">Open Admin Panel</a>
+
+    <section class="tests">
+      <h2>Performance Tests</h2>
+      <div class="test-grid">
+        <article class="test-card">
+          <h3>1. Broad Jump</h3>
+          <p>This test evaluates explosive lower-body power by measuring horizontal jump distance.</p>
+          <video controls preload="metadata" playsinline>
+            <source src="https://d19vjxyttg06q6.cloudfront.net/media/post_processed_video/35af29cb-200d-47bf-a3f4-59ad009fbe42.mp4" type="video/mp4">
+          </video>
+        </article>
+
+        <article class="test-card">
+          <h3>2. Sit and Reach</h3>
+          <p>This test evaluates hamstring and lower-back flexibility through forward reach distance.</p>
+          <video controls preload="metadata" playsinline>
+            <source src="https://d19vjxyttg06q6.cloudfront.net/media/post_processed_video/97abe8f2-8aae-450a-9afd-5c803c904f82.mp4" type="video/mp4">
+          </video>
+        </article>
+
+        <article class="test-card">
+          <h3>3. Sit and Throw</h3>
+          <p>This test evaluates seated upper-body power by tracking ball travel from a fixed posture.</p>
+          <video controls preload="metadata" playsinline>
+            <source src="https://d19vjxyttg06q6.cloudfront.net/media/post_processed_video/0fdd573f-9b62-47f9-8008-b68a2f739d58.mp4" type="video/mp4">
+          </video>
+        </article>
+
+        <article class="test-card">
+          <h3>4. Plank</h3>
+          <p>This test evaluates core endurance by monitoring hold duration under stable posture.</p>
+          <video controls preload="metadata" playsinline>
+            <source src="https://d19vjxyttg06q6.cloudfront.net/media/post_processed_video/45767ad9-0609-459b-aa8e-97c82d66a3e1.mp4" type="video/mp4">
+          </video>
+        </article>
+
+        <article class="test-card">
+          <h3>5. 15M Dash</h3>
+          <p>This test evaluates sprint acceleration and speed across a short timed distance.</p>
+          <video controls preload="metadata" playsinline>
+            <source src="https://d19vjxyttg06q6.cloudfront.net/media/post_processed_video/343d78ca-7a00-4064-9cc0-a08180f70ff1.mp4" type="video/mp4">
+          </video>
+        </article>
+
+        <article class="test-card">
+          <h3>6. 6x10M Shuttle Run</h3>
+          <p>This test evaluates agility, speed endurance, and turning efficiency over repeated shuttles.</p>
+          <video controls preload="metadata" playsinline>
+            <source src="https://d19vjxyttg06q6.cloudfront.net/media/post_processed_video/4b9d1e4c-6435-4ea8-afd1-d193cfb44cdd.mp4" type="video/mp4">
+          </video>
+        </article>
+
+        <article class="test-card">
+          <h3>7. T Test</h3>
+          <p>This test evaluates multidirectional agility with forward sprint, lateral shuffle, and backpedal phases.</p>
+          <video controls preload="metadata" playsinline>
+            <source src="https://d19vjxyttg06q6.cloudfront.net/media/post_processed_video/4ab53580-b5b2-442e-a12c-ba2b2ee6dc25.mp4" type="video/mp4">
+          </video>
+        </article>
+      </div>
+    </section>
   </main>
 </body>
 </html>
