@@ -56,7 +56,7 @@ class PetVideos(models.Model):
             else:
                 self.duration = time
                 self.distance = distance
-                return False
+                return True
 
     def run_processing(self):
         """
