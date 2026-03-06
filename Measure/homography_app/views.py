@@ -215,7 +215,6 @@ def upload_video(request):
         'updated': not created
     })
 
-@csrf_exempt
 def _parse_homograph_points(raw_points):
     if not raw_points:
         return DEFAULT_HOMOGRAPH_POINTS
@@ -451,7 +450,7 @@ def _run_homography_calibration(frame, payload):
         'message': end_point_of_mat
     })
 
-
+@csrf_exempt
 def upload_calibration_video(request):
     """
     recieves a video , extract on frame from video and marks calibration points
@@ -459,18 +458,14 @@ def upload_calibration_video(request):
     if request.method != 'POST' or not request.FILES.get('video'):
         return JsonResponse({'status': 'error', 'message': 'No image uploaded'}, status=400)
 
-    payload = {
-        'video_file': request.FILES['video'],
-        'test_id': request.POST.get('test_id', 'not_sit_and_reach'),
-        'unit_distance': float(request.POST.get('square_size', 2.5908)),
-        'position_factor': float(request.POST.get('position_factor', 0.5)),
-        'position_factor2': float(request.POST.get('position_factor2', 0.15)),
-        'assessment_id': request.POST.get('assessment_id', 'notvalid'),
-        'use_homograph': _as_bool(request.POST.get('use_homograph', 'false'), default=False),
-        'use_sam_homograph': _as_bool(request.POST.get('use_sam_homograph', 'false'), default=False),
-        'origin_x': float(request.POST.get('origin_x', 0)),
-        'origin_y': float(request.POST.get('origin_y', 0)),
-    }
+    payload = dict(video_file=request.FILES['video'], test_id=request.POST.get('test_id', 'not_sit_and_reach'),
+                   unit_distance=float(request.POST.get('square_size', 2.5908)),
+                   position_factor=float(request.POST.get('position_factor', 0.5)),
+                   position_factor2=float(request.POST.get('position_factor2', 0.15)),
+                   assessment_id=request.POST.get('assessment_id', 'notvalid'),
+                   use_homograph=_as_bool(request.POST.get('use_homograph', 'false'), default=False),
+                   use_sam_homograph=_as_bool(request.POST.get('use_sam_homograph', 'false'), default=False),
+                   origin_x=float(request.POST.get('origin_x', 0)), origin_y=float(request.POST.get('origin_y', 0)))
     payload['homograph_points'] = _parse_homograph_points(request.POST.get('hpoints', None))
 
     try:
