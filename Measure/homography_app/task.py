@@ -1,39 +1,81 @@
 import os
 import logging
+import subprocess
 from background_task import background
 from django.conf import settings
 from django.core.files import File
 import cv2
-import json
 import numpy as np
-from polars.selectors import duration
-from sympy.codegen.scipy_nodes import powm1
 
 from .checkpoint_crossing import detect_crossing_rightmost_ankle, detect_crossing_person_box, \
     detect_crossing_person_box_reverse_nobuffer, write_video_until_frame
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
-    distance_from_homography, get_flat_start, \
+    get_flat_start, \
     ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima, test_video_url, \
     image_point_to_real_point
-import glob
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
 
 from .plank_helper import mark_right_side_pose
-from .sit_and_reach_helper_ import detect_yellow_strip_positions_mask, find_three_centers_from_mask, \
-    estimate_distance_between_points, middle_finger_movement_distance
-from .sit_and_throw_helper import get_first_bounce_frame, get_first_bounce_frame_MOG
+from .sit_and_reach_helper_ import middle_finger_movement_distance
+from .sit_and_throw_helper import get_first_bounce_frame_MOG
 
 logger = logging.getLogger('homography_app')
 
-import os
-from django.conf import settings
+def _legacy_video_path(video_obj):
+    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
+    return os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}{ext}")
 
 
-import os
-import subprocess
-from django.conf import settings
+def _canonical_video_path(video_obj):
+    return os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}.mp4")
+
+
+def _remove_files(*paths):
+    for path in paths:
+        if path and os.path.exists(path):
+            os.remove(path)
+
+
+def _cleanup_local_video(video_obj):
+    _remove_files(_legacy_video_path(video_obj), _canonical_video_path(video_obj))
+
+
+def _encode_to_h264(input_path, output_path):
+    subprocess.run([
+        'ffmpeg', '-i', input_path,
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+        '-c:a', 'aac', '-movflags', '+faststart', '-y',
+        output_path
+    ], check=True)
+
+
+def _ensure_local_video(video_obj):
+    """Stage 1: make sure a local processing video is available and return its path."""
+    mp4_path = _canonical_video_path(video_obj)
+    legacy_path = _legacy_video_path(video_obj)
+    if os.path.exists(mp4_path):
+        return mp4_path
+    if os.path.exists(legacy_path):
+        return legacy_path
+
+    downloaded_path = download_and_save_video(video_obj)
+    if os.path.exists(downloaded_path):
+        return downloaded_path
+
+    # Fallback for older workflows.
+    if os.path.exists(legacy_path):
+        return legacy_path
+    raise FileNotFoundError(f"Local video was not created for id={video_obj.id}")
+
+
+def _save_processed_file(video_obj, output_path, original_name):
+    if video_obj.processed_file:
+        video_obj.processed_file.delete(save=False)
+        video_obj.processed_file = None
+    with open(output_path, 'rb') as f:
+        video_obj.processed_file.save(original_name, File(f), save=False)
 
 
 def download_and_save_video(obj):
@@ -75,9 +117,9 @@ def download_and_save_video(obj):
         ],
         check=True,
     )
-    if os.path.exists(raw_path):
-        os.remove(raw_path)
-        print("Deleted raw upload:", raw_path)
+    _remove_files(raw_path)
+    print("Deleted raw upload:", raw_path)
+    return final_path
 
 
 
@@ -99,13 +141,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-    video_path  = os.path.join(
-                    settings.TEMP_VIDEO_STORAGE,
-                    f"videot_{petvideo_id}{ext}"
-                    )
-    if not os.path.exists(video_path):
-        download_and_save_video(video_obj)
+    video_path = _ensure_local_video(video_obj)
 
     output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
     os.makedirs(output_dir, exist_ok=True)
@@ -152,31 +188,11 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
 
         final_output_path = f"temp_media_store/processed_{original_name}"
 
-        subprocess.run([
-            'ffmpeg', '-i', opth,
-            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-            '-c:a', 'aac', '-movflags', '+faststart', '-y',
-            final_output_path
-        ], check=True)
+        _encode_to_h264(opth, final_output_path)
         if is_changed:
-            if video_obj.processed_file:
-                video_obj.processed_file.delete(save=False)
-                video_obj.processed_file = None
-            with open(final_output_path, 'rb') as f:
-                video_obj.processed_file.save(original_name, File(f), save=False)
-        for path in [final_output_path]:
-            if os.path.exists(path):
-                os.remove(path)
-        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-        file_path = os.path.join(
-            settings.TEMP_VIDEO_STORAGE,
-            f"videot_{petvideo_id}{ext}"
-        )
-
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        if os.path.exists(opth):
-            os.remove(opth)
+            _save_processed_file(video_obj, final_output_path, original_name)
+        _remove_files(final_output_path, opth)
+        _cleanup_local_video(video_obj)
         video_obj.save()
 
         test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
@@ -198,14 +214,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
         except PetVideos.DoesNotExist:
             logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
             return
-        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-
-        video_path  = os.path.join(
-                    settings.TEMP_VIDEO_STORAGE,
-                    f"videot_{petvideo_id}{ext}"
-                    )
-        if not os.path.exists(video_path):
-            download_and_save_video(video_obj)
+        video_path = _ensure_local_video(video_obj)
 
         try:
             video_obj.is_video_processed = False
@@ -242,12 +251,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
 
-            subprocess.run([
-                'ffmpeg', '-i', opth,
-                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-                '-c:a', 'aac', '-movflags', '+faststart', '-y',
-                final_output_path
-            ], check=True)
+            _encode_to_h264(opth, final_output_path)
 
 
             #----#
@@ -262,27 +266,13 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             if distance:
                 is_changed = video_obj.update_metrix(0, distance)
             if is_changed:
-                if video_obj.processed_file:
-                    video_obj.processed_file.delete(save=False)
-                    video_obj.processed_file = None
-                with open(final_output_path, 'rb') as f:
-                    video_obj.processed_file.save(original_name, File(f), save=False)
-            for path in [final_output_path]:
-                if os.path.exists(path):
-                    os.remove(path)
+                _save_processed_file(video_obj, final_output_path, original_name)
+            _remove_files(final_output_path)
             video_obj.is_video_processed = True
             video_obj.progress = 100
             video_obj.save()
-            ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-            file_path = os.path.join(
-                settings.TEMP_VIDEO_STORAGE,
-                f"videot_{petvideo_id}{ext}"
-            )
-
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            if os.path.exists(opth):
-                os.remove(opth)
+            _remove_files(opth)
+            _cleanup_local_video(video_obj)
             test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
             logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
@@ -326,13 +316,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         # test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
         logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
         return
-    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-    video_path = os.path.join(
-        settings.TEMP_VIDEO_STORAGE,
-        f"videot_{petvideo_id}{ext}"
-    )
-    if not os.path.exists(video_path):
-        download_and_save_video(video_obj)
+    video_path = _ensure_local_video(video_obj)
     original_name = os.path.basename(video_obj.file.name)
 
     output_dir = "temp_media_store"
@@ -519,12 +503,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         cap.release()
         out.release()
         # --- ffmpeg encode ---
-        subprocess.run([
-            'ffmpeg', '-i', temp_output_path,
-            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-            '-c:a', 'aac', '-movflags', '+faststart', '-y',
-            final_output_path
-        ], check=True)
+        _encode_to_h264(temp_output_path, final_output_path)
 
 
 
@@ -533,23 +512,10 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         video_obj.progress = 100
         is_changed = video_obj.update_metrix(0, distance_ft)
         if is_changed:
-            if video_obj.processed_file:
-                video_obj.processed_file.delete(save=False)
-                video_obj.processed_file = None
-            with open(final_output_path, 'rb') as f:
-                video_obj.processed_file.save(original_name, File(f), save=False)
+            _save_processed_file(video_obj, final_output_path, original_name)
         video_obj.save()
-        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-        file_path = os.path.join(
-            settings.TEMP_VIDEO_STORAGE,
-            f"videot_{petvideo_id}{ext}"
-        )
-
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        for path in [temp_output_path, final_output_path]:
-            if os.path.exists(path):
-                os.remove(path)
+        _cleanup_local_video(video_obj)
+        _remove_files(temp_output_path, final_output_path)
         test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
         logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
 
@@ -577,13 +543,7 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-    video_path = os.path.join(
-        settings.TEMP_VIDEO_STORAGE,
-        f"videot_{petvideo_id}{ext}"
-    )
-    if not os.path.exists(video_path):
-        download_and_save_video(video_obj)
+    video_path = _ensure_local_video(video_obj)
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
@@ -621,38 +581,17 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
                     video_obj.is_video_processed = True
                     video_obj.progress = 100
                     video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
-                ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-                file_path = os.path.join(
-                    settings.TEMP_VIDEO_STORAGE,
-                    f"videot_{petvideo_id}{ext}"
-                )
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                _cleanup_local_video(video_obj)
                 logger.info(f"[process_video_task] Detection failed {petvideo_id}")
                 return
         video_obj.distance = homograph_obj.unit_distance
         video_obj.is_video_processed = True
         video_obj.progress = 100
-        subprocess.run([
-            'ffmpeg', '-i', "motion_output.mp4",
-            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-            '-c:a', 'aac', '-movflags', '+faststart', '-y',
-            final_output_path
-        ], check=True)
+        _encode_to_h264("motion_output.mp4", final_output_path)
 
-        with open(final_output_path, 'rb') as f:
-            video_obj.processed_file.save(original_name, File(f), save=False)
-        for path in [final_output_path]:
-            if os.path.exists(path):
-                os.remove(path)
-        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-        file_path = os.path.join(
-            settings.TEMP_VIDEO_STORAGE,
-            f"videot_{petvideo_id}{ext}"
-        )
-
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        _save_processed_file(video_obj, final_output_path, original_name)
+        _remove_files(final_output_path)
+        _cleanup_local_video(video_obj)
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
@@ -679,13 +618,7 @@ def process_plank(petvideo_id, test_id, assessment_id):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-    video_path = os.path.join(
-        settings.TEMP_VIDEO_STORAGE,
-        f"videot_{petvideo_id}{ext}"
-    )
-    if not os.path.exists(video_path):
-        download_and_save_video(video_obj)
+    video_path = _ensure_local_video(video_obj)
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
@@ -705,29 +638,13 @@ def process_plank(petvideo_id, test_id, assessment_id):
         video_obj.distance = 0.0
         video_obj.is_video_processed = True
         video_obj.progress = 100
-        subprocess.run([
-            'ffmpeg', '-i', opth,
-            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-            '-c:a', 'aac', '-movflags', '+faststart', '-y',
-            final_output_path
-        ], check=True)
+        _encode_to_h264(opth, final_output_path)
 
-        with open(final_output_path, 'rb') as f:
-            video_obj.processed_file.save(original_name, File(f), save=False)
-        for path in [final_output_path]:
-            if os.path.exists(path):
-                os.remove(path)
-        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-        file_path = os.path.join(
-            settings.TEMP_VIDEO_STORAGE,
-            f"videot_{petvideo_id}{ext}"
-        )
-
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        _save_processed_file(video_obj, final_output_path, original_name)
+        _remove_files(final_output_path)
+        _cleanup_local_video(video_obj)
         video_obj.save()
-        if os.path.exists(opth):
-            os.remove(opth)
+        _remove_files(opth)
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id,
                        vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
@@ -753,13 +670,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-    video_path = os.path.join(
-        settings.TEMP_VIDEO_STORAGE,
-        f"videot_{petvideo_id}{ext}"
-    )
-    if not os.path.exists(video_path):
-        download_and_save_video(video_obj)
+    video_path = _ensure_local_video(video_obj)
 
     #with open(video_path, 'rb') as f:
     #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
@@ -802,43 +713,17 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
                     video_obj.is_video_processed = True
                     video_obj.progress = 100
                     video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
-                ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-                file_path = os.path.join(
-                    settings.TEMP_VIDEO_STORAGE,
-                    f"videot_{petvideo_id}{ext}"
-                )
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                _cleanup_local_video(video_obj)
                 logger.info(f"[process_video_task] Detection failed {petvideo_id}")
                 return
         video_obj.distance = homograph_obj.unit_distance
         video_obj.is_video_processed = True
         video_obj.progress = 100
-        subprocess.run([
-            'ffmpeg', '-i', opth,
-            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-            '-c:a', 'aac', '-movflags', '+faststart', '-y',
-            final_output_path
-        ], check=True)
+        _encode_to_h264(opth, final_output_path)
         if is_changed:
-            if video_obj.processed_file:
-                video_obj.processed_file.delete(save=False)
-                video_obj.processed_file = None
-            with open(final_output_path, 'rb') as f:
-                video_obj.processed_file.save(original_name, File(f), save=False)
-        for path in [final_output_path]:
-            if os.path.exists(path):
-                os.remove(path)
-        ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-        file_path = os.path.join(
-            settings.TEMP_VIDEO_STORAGE,
-            f"videot_{petvideo_id}{ext}"
-        )
-
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        if os.path.exists(opth):
-            os.remove(opth)
+            _save_processed_file(video_obj, final_output_path, original_name)
+        _remove_files(final_output_path, opth)
+        _cleanup_local_video(video_obj)
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
         logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")

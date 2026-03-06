@@ -39,6 +39,102 @@ def landing_page(request):
     return render(request, 'landing.html')
 
 
+def _as_bool(value, default=False):
+    if value is None:
+        return default
+    return str(value).lower() in ('true', '1', 'yes', 'on')
+
+
+def _video_defaults(video, participant_name, pet_type, duration_ms, to_be_processed, take_best=False):
+    return {
+        'name': video.name,
+        'file': video,
+        'participant_name': participant_name,
+        'pet_type': pet_type,
+        'duration': round(duration_ms / 1000, 3),
+        'progress': 0 if to_be_processed else 100,
+        'to_be_processed': to_be_processed,
+        'is_video_processed': False if to_be_processed else True,
+        'take_best': take_best,
+    }
+
+
+def _create_1fps_video_file(uploaded_video):
+    """Create a 1fps mp4 from uploaded stream and return a django File plus temp paths."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_input:
+        for chunk in uploaded_video.chunks():
+            temp_input.write(chunk)
+        temp_input_path = temp_input.name
+
+    temp_output_path = temp_input_path.replace('.mp4', '_1fps.mp4')
+    command = [
+        'ffmpeg',
+        '-y',
+        '-i', temp_input_path,
+        '-vf', 'fps=1,setpts=N/30/TB',
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-pix_fmt', 'yuv420p',
+        '-an',
+        temp_output_path,
+    ]
+    subprocess.run(command, check=True)
+    return temp_input_path, temp_output_path
+
+
+def _cache_video_for_worker(video_obj):
+    """Store an h264 worker-local copy at TEMP_VIDEO_STORAGE/videot_<id>.mp4."""
+    os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
+
+    ext = os.path.splitext(video_obj.file.name)[1].lower() or '.mp4'
+    raw_path = os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}_raw{ext}")
+    final_path = os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}.mp4")
+
+    with video_obj.file.open('rb') as src, open(raw_path, 'wb') as destination:
+        for chunk in src.chunks():
+            destination.write(chunk)
+        destination.flush()
+        os.fsync(destination.fileno())
+
+    print(f"Debug: saving raw video -> {raw_path}")
+    print("Raw video size:", os.path.getsize(raw_path))
+
+    try:
+        subprocess.run([
+            'ffmpeg', '-i', raw_path,
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+            '-c:a', 'aac', '-movflags', '+faststart', '-y',
+            final_path
+        ], check=True)
+    except subprocess.CalledProcessError as e:
+        print('FFmpeg failed. Keeping raw file for debugging.')
+        raise e
+
+    if os.path.exists(raw_path):
+        os.remove(raw_path)
+        print('Deleted raw upload:', raw_path)
+
+
+def _dispatch_processing_task(video_id, test_id, assessment_id, enable_color_marker_tracking, enable_start_end_detector):
+    if test_id == 'BwbJyXKl':
+        process_sit_and_throw(video_id, test_id=test_id, assessment_id=assessment_id)
+    elif test_id == 'vPbXoPK4':
+        process_sit_and_reach(video_id, test_id=test_id, assessment_id=assessment_id)
+    elif test_id in ('lzb1PEKm', 'Vnb7E6L6', 'VpKl80KM'):
+        process_15m_dash(video_id, test_id=test_id, assessment_id=assessment_id)
+    elif test_id == 'vmK617LE':
+        process_plank(video_id, test_id=test_id, assessment_id=assessment_id)
+    else:
+        process_video_task(
+            video_id,
+            enable_color_marker_tracking=enable_color_marker_tracking,
+            enable_start_end_detector=enable_start_end_detector,
+            test_id=test_id,
+            assessment_id=assessment_id,
+        )
+
+
 @csrf_exempt
 def upload_video(request):
     """
@@ -46,153 +142,78 @@ def upload_video(request):
     if video is of test which have distance as measurable quantity,
     program sends it to processing for distance calculations
     """
-    if request.method == 'POST' and request.FILES.get('video'):
-        video = request.FILES['video']
+    if request.method != 'POST' or not request.FILES.get('video'):
+        return JsonResponse({'status': 'error'}, status=400)
 
-        # Get extra fields from POST
-        participant_name = request.POST.get('participant_name', 'NoName')
-        pet_type = request.POST.get('pet_type', 'BT')
-        duration = float(request.POST.get('duration', 0))
-        to_be_processed_str = request.POST.get('to_be_processed', 'true').lower()
-        to_be_processed = to_be_processed_str in ('true', '1', 'yes', 'on')
-        test_id = request.POST.get('test_id', "jump")
-        participant_id = request.POST.get('participant_id', 'Dummy')
-        assessment_id = request.POST.get('assessment_id', 'Dummy')
-        enable_start_end_detector = request.POST.get('enable_start_end_detector', 'true').lower()
-        enable_color_marker_tracking = request.POST.get('enable_color_marker_tracking', 'true').lower()
-        enable_start_end_detector = enable_start_end_detector in ('true', '1', 'yes', 'on')
-        enable_color_marker_tracking = enable_color_marker_tracking in ('true', '1', 'yes', 'on')
-        take_best = request.POST.get('take_best').lower()
-        take_best = take_best in ('true', '1', 'yes', 'on')
-        os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
+    video = request.FILES['video']
+    participant_name = request.POST.get('participant_name', 'NoName')
+    pet_type = request.POST.get('pet_type', 'BT')
+    duration_ms = float(request.POST.get('duration', 0))
+    to_be_processed = _as_bool(request.POST.get('to_be_processed', 'true'), default=True)
+    test_id = request.POST.get('test_id', 'jump')
+    participant_id = request.POST.get('participant_id', 'Dummy')
+    assessment_id = request.POST.get('assessment_id', 'Dummy')
+    enable_start_end_detector = _as_bool(request.POST.get('enable_start_end_detector', 'true'), default=True)
+    enable_color_marker_tracking = _as_bool(request.POST.get('enable_color_marker_tracking', 'true'), default=True)
+    take_best = _as_bool(request.POST.get('take_best', 'false'), default=False)
 
+    os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
 
-        if test_id == "vmK617LE":
-            if request.method == 'POST' and video:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_input:
-                    for chunk in video.chunks():
-                        temp_input.write(chunk)
-                    temp_input_path = temp_input.name
-
-                temp_output_path = temp_input_path.replace(".mp4", "_1fps.mp4")
-                command = [
-                    "ffmpeg",
-                    "-y",
-                    "-i", temp_input_path,
-                    "-vf", "fps=1,setpts=N/30/TB",
-                    "-c:v", "libx264",
-                    "-preset", "fast",
-                    "-crf", "23",
-                    "-pix_fmt", "yuv420p",
-                    "-an",
-                    temp_output_path
-                ]
-
-                subprocess.run(command, check=True)
-
-                with open(temp_output_path, 'rb') as f:
-                    django_file = File(f)
-
-                    obj, created = PetVideos.objects.update_or_create(
-                        participant_id=participant_id,
-                        test_id=test_id,
-                        assessment_id=assessment_id,
-                        defaults={
-                            'name': video.name,
-                            'file': django_file,
-                            'participant_name': participant_name,
-                            'pet_type': pet_type,
-                            'duration': round(duration / 1000, 3),
-                            'progress': 0 if to_be_processed else 100,
-                            'to_be_processed': to_be_processed,
-                            'is_video_processed': False if to_be_processed else True
-                        }
+    if test_id == 'vmK617LE':
+        temp_input_path = None
+        temp_output_path = None
+        try:
+            temp_input_path, temp_output_path = _create_1fps_video_file(video)
+            with open(temp_output_path, 'rb') as f:
+                obj, created = PetVideos.objects.update_or_create(
+                    participant_id=participant_id,
+                    test_id=test_id,
+                    assessment_id=assessment_id,
+                    defaults=_video_defaults(
+                        File(f, name=video.name),
+                        participant_name,
+                        pet_type,
+                        duration_ms,
+                        to_be_processed,
+                        take_best=take_best,
                     )
-
+                )
+        finally:
+            if temp_input_path and os.path.exists(temp_input_path):
                 os.remove(temp_input_path)
+            if temp_output_path and os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
-        else:
-            obj, created = PetVideos.objects.update_or_create(
-                participant_id=participant_id,
-                test_id=test_id,
-                assessment_id=assessment_id,
-                defaults={
-                    'name': video.name,
-                    'file': video,
-                    'participant_name': participant_name,
-                    'pet_type': pet_type,
-                    'duration': round(duration / 1000, 3),
-                    'progress': 0 if to_be_processed else 100,
-                    'to_be_processed': to_be_processed,
-                    'is_video_processed': False if to_be_processed else True,
-                    'take_best': take_best
-                }
+    else:
+        obj, created = PetVideos.objects.update_or_create(
+            participant_id=participant_id,
+            test_id=test_id,
+            assessment_id=assessment_id,
+            defaults=_video_defaults(
+                video,
+                participant_name,
+                pet_type,
+                duration_ms,
+                to_be_processed,
+                take_best=take_best,
             )
-            ext = os.path.splitext(video.name)[1].lower()
-            raw_path = os.path.join(
-                settings.TEMP_VIDEO_STORAGE,
-                f"videot_{obj.id}_raw{ext}"
-            )
+        )
+        _cache_video_for_worker(obj)
 
-            print(f"Debug: saving raw video → {raw_path}")
+    _dispatch_processing_task(
+        obj.id,
+        test_id,
+        assessment_id,
+        enable_color_marker_tracking,
+        enable_start_end_detector,
+    )
 
-            with open(raw_path, "wb") as destination:
-                for chunk in video.chunks():
-                    destination.write(chunk)
-                destination.flush()
-                os.fsync(destination.fileno())
-
-            print("Raw video size:", os.path.getsize(raw_path))
-            final_path = os.path.join(
-                settings.TEMP_VIDEO_STORAGE,
-                f"videot_{obj.id}.mp4"
-            )
-
-            try:
-                subprocess.run([
-                    'ffmpeg', '-i', raw_path,
-                    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-                    '-c:a', 'aac', '-movflags', '+faststart', '-y',
-                    final_path
-                ], check=True)
-
-                if os.path.exists(raw_path):
-                    os.remove(raw_path)
-                    print("Deleted raw upload:", raw_path)
-
-            except subprocess.CalledProcessError as e:
-                print("FFmpeg failed. Keeping raw file for debugging.")
-                raise e
-
-        # ext = os.path.splitext(video.name)[1]
-        # file_path = os.path.join(
-        #     settings.TEMP_VIDEO_STORAGE,
-        #     f"videot_{obj.id}{ext}"
-        # )
-        # print(f"Debug: videot_{obj.id}{ext}")
-        # with open(file_path, 'wb') as destination:
-        #     for chunk in video.chunks():
-        #         destination.write(chunk)
-
-        if test_id == "BwbJyXKl":
-            process_sit_and_throw(obj.id, test_id=test_id, assessment_id =assessment_id)
-        elif test_id == "vPbXoPK4":
-            process_sit_and_reach(obj.id, test_id=test_id, assessment_id=assessment_id)
-        elif test_id == "lzb1PEKm" or test_id == "Vnb7E6L6" or  test_id=="VpKl80KM":
-            process_15m_dash(obj.id,test_id=test_id,assessment_id=assessment_id)
-        elif test_id == "vmK617LE":
-            process_plank(obj.id, test_id=test_id, assessment_id=assessment_id)
-        else:
-            process_video_task(obj.id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id)
-        return JsonResponse({
-            'status': 'success',
-            'name': obj.name,
-            'participant_name': obj.participant_name,
-            'pet_type': obj.pet_type,
-            'updated': not created
-        })
-
-    return JsonResponse({'status': 'error'}, status=400)
+    return JsonResponse({
+        'status': 'success',
+        'name': obj.name,
+        'participant_name': obj.participant_name,
+        'pet_type': obj.pet_type,
+        'updated': not created
+    })
 
 @csrf_exempt
 def upload_calibration_video(request):
