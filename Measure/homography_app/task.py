@@ -779,7 +779,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
 
         #fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, reference=homograph_obj.unit_distance,show=False)
 
-        duration =  - 3.5
+        duration =  -5
         original_name = os.path.basename(video_obj.file.name)
 
         final_output_path = f"temp_media_store/processed_{original_name}"
@@ -794,8 +794,8 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
             print(fno, "Stop frame")
             if duration and duration > 1:
                 #video_obj.duration = duration - 3.5
-                is_changed = video_obj.update_metrix(duration - 3.5, None)
-                write_video_until_frame(video_path, duration=-3.5 + duration, end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance, output_path=opth)
+                is_changed = video_obj.update_metrix(duration - 5, None)
+                write_video_until_frame(video_path, duration=-5 + duration, end_frame_idx=fno, x_B=homograph_obj.end_pixel, reference=homograph_obj.unit_distance, output_path=opth)
                 pass
             else:
                 with open(video_path, 'rb') as f:
