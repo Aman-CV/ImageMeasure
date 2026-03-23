@@ -44,11 +44,13 @@ def _cleanup_local_video(video_obj):
 
 def _encode_to_h264(input_path, output_path):
     subprocess.run([
-        'ffmpeg', '-i', input_path,
+        'ffmpeg', '-i', input_path,  "-loglevel", "error",
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
         '-c:a', 'aac', '-movflags', '+faststart', '-y',
         output_path
-    ], check=True)
+    ],     check=True,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL)
 
 
 def _ensure_local_video(video_obj):
@@ -106,6 +108,7 @@ def download_and_save_video(obj):
     subprocess.run(
         [
             "ffmpeg",
+            "-loglevel", "error",
             "-i", raw_path,
             "-c:v", "libx264",
             "-preset", "veryfast",
@@ -116,6 +119,8 @@ def download_and_save_video(obj):
             final_path,
         ],
         check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
     )
     _remove_files(raw_path)
     print("Deleted raw upload:", raw_path)
