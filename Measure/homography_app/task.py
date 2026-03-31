@@ -9,7 +9,7 @@ import numpy as np
 
 from .checkpoint_crossing import detect_crossing_rightmost_ankle, detect_crossing_person_box, \
     detect_crossing_person_box_reverse_nobuffer, write_video_until_frame
-from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
+from .models import PetVideos, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     get_flat_start, \
     ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima, test_video_url, \
@@ -159,7 +159,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         ).first()
         use_homograph = homograph_obj.use_homograph if homograph_obj else False
         if not homograph_obj:
-            homograph_obj = SingletonHomographicMatrixModel.load()
+            raise Exception(f"Calibration data not found for assessment_id: {assessment_id} and test_id: {test_id}")
         opth = f"motion_output_{petvideo_id}.mp4"
         cx, cy, cf = get_first_bounce_frame_MOG(video_path,
                     start_cutoff=(homograph_obj.origin_x + 10.0)/1280.0 if homograph_obj.start_pixel !=0 else 0.25, video_obj=video_obj, output_pth=opth)
@@ -230,7 +230,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             ).first()
             use_homograph = homograph_obj.use_homograph if homograph_obj else False
             if not homograph_obj:
-                homograph_obj = SingletonHomographicMatrixModel.load()
+                raise Exception(f"Calibration data not found for assessment_id: {assessment_id} and test_id: {test_id}")
             opth = f"motion_output_{petvideo_id}.mp4"
             distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj, output_pth=opth, target_y=[homograph_obj.origin_x, homograph_obj.origin_y] if homograph_obj.origin_y != 0 else None)
 
@@ -435,9 +435,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         use_homograph = homograph_obj.use_homograph if homograph_obj else False
 
         if not homograph_obj:
-            print("Calibration was not successful")
-            homograph_obj = SingletonHomographicMatrixModel.load()
-            use_homograph = False
+            raise Exception(f"Calibration data not found for assessment_id: {assessment_id} and test_id: {test_id}")
 
 
         print(homograph_obj.start_pixel, homograph_obj.end_pixel, pt2[0])
@@ -565,7 +563,7 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
         ).first()
         use_homograph = False
         if not homograph_obj:
-            homograph_obj = SingletonHomographicMatrixModel.load()
+            raise Exception(f"Calibration data not found for assessment_id: {assessment_id} and test_id: {test_id}")
         fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, reference=homograph_obj.unit_distance,show=False)
         print(fno, duration)
         if not duration:

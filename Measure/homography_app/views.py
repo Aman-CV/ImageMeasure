@@ -254,7 +254,7 @@ def _extract_middle_frame(video_file, test_id):
 
         if not ret or frame is None:
             raise ValueError('Could not extract frame from video')
-
+        cv2.imwrite("media/calib_frame.jpg", frame)
         return cv2.resize(frame, (1280, 720))
     finally:
         if cap:
@@ -264,21 +264,22 @@ def _extract_middle_frame(video_file, test_id):
 
 
 def _save_preview_to_singleton(singleton, frame, file_name='frame.jpg'):
-    _, buffer = cv2.imencode('.jpg', frame)
+    return
+    # _, buffer = cv2.imencode('.jpg', frame)
 
-    if singleton.file:
-        singleton.file.delete(save=False)
-    singleton.file.save(file_name, ContentFile(buffer.tobytes()), save=False)
+    # if singleton.file:
+    #     singleton.file.delete(save=False)
+    # singleton.file.save(file_name, ContentFile(buffer.tobytes()), save=False)
 
-    if singleton.mask:
-        singleton.mask.delete(save=False)
-    singleton.mask.save('mask.jpg', ContentFile(buffer.tobytes()), save=False)
+    # if singleton.mask:
+    #     singleton.mask.delete(save=False)
+    # singleton.mask.save('mask.jpg', ContentFile(buffer.tobytes()), save=False)
 
-    singleton.save()
+    # singleton.save()
 
 
 def _run_simple_calibration(frame, payload):
-    singleton = SingletonHomographicMatrixModel.load()
+    # singleton = SingletonHomographicMatrixModel.load()
     h, w = frame.shape[:2]
 
     start_candidate = int(w * payload['position_factor2'])
@@ -286,9 +287,9 @@ def _run_simple_calibration(frame, payload):
     start_pixel = min(start_candidate, end_candidate)
     end_pixel = max(start_candidate, end_candidate)
 
-    singleton.unit_distance = payload['unit_distance']
-    singleton.start_pixel = start_pixel
-    singleton.end_pixel = end_pixel
+    # singleton.unit_distance = payload['unit_distance']
+    # singleton.start_pixel = start_pixel
+    # singleton.end_pixel = end_pixel
 
     homograph_points = payload['homograph_points']
     use_homograph = payload['use_homograph']
@@ -336,7 +337,7 @@ def _run_simple_calibration(frame, payload):
     else:
         cv2.line(frame, (int(payload['origin_x'] * w), 0), (int(payload['origin_x'] * w), h), (0, 255, 0), 2)
 
-    _save_preview_to_singleton(singleton, frame, file_name='frame.jpg')
+    # _save_preview_to_singleton(singleton, frame, file_name='frame.jpg')
 
     CalibrationDataModel.objects.update_or_create(
         test_id=payload['test_id'],
@@ -355,17 +356,17 @@ def _run_simple_calibration(frame, payload):
 
 
 def _run_homography_calibration(frame, payload):
-    singleton = SingletonHomographicMatrixModel.load()
+    # singleton = SingletonHomographicMatrixModel.load()
     homograph_points = payload['homograph_points']
     use_homograph = payload['use_homograph']
     h, w = frame.shape[:2]
 
-    if singleton.hsv_value:
-        h_val = singleton.hsv_value.get('h', DEFAULT_HSV[0])
-        s_val = singleton.hsv_value.get('s', DEFAULT_HSV[1])
-        v_val = singleton.hsv_value.get('v', DEFAULT_HSV[2])
-    else:
-        h_val, s_val, v_val = DEFAULT_HSV
+    # if singleton.hsv_value:
+    #     h_val = singleton.hsv_value.get('h', DEFAULT_HSV[0])
+    #     s_val = singleton.hsv_value.get('s', DEFAULT_HSV[1])
+    #     v_val = singleton.hsv_value.get('v', DEFAULT_HSV[2])
+    # else:
+    h_val, s_val, v_val = DEFAULT_HSV
 
     p1 = [int(homograph_points['p1']['fx'] * w), int(homograph_points['p1']['fy'] * h)]
     selected_point = p1
@@ -410,19 +411,19 @@ def _run_homography_calibration(frame, payload):
     H, _ = cv2.findHomography(order_points, world_pts)
     homography_matrix = H.tolist()
 
-    homography_obj = SingletonHomographicMatrixModel.load()
-    json_content = json.dumps(homography_matrix)
-    if homography_obj.matrix:
-        homography_obj.matrix.delete(save=False)
-    homography_obj.matrix.save('homography.json', ContentFile(json_content), save=False)
-    homography_obj.unit_distance = unit_distance
-    homography_obj.start_pixel_broad_jump = order_points[0][0]
+    # homography_obj = SingletonHomographicMatrixModel.load()
+    # json_content = json.dumps(homography_matrix)
+    # if homography_obj.matrix:
+    #     homography_obj.matrix.delete(save=False)
+    # homography_obj.matrix.save('homography.json', ContentFile(json_content), save=False)
+    # homography_obj.unit_distance = unit_distance
+    # homography_obj.start_pixel_broad_jump = order_points[0][0]
 
     for idx, (x, y) in enumerate(order_points):
         cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), -1)
         cv2.putText(frame, str(idx + 1), (int(x) + 5, int(y) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (233, 0, 2), 1)
 
-    _save_preview_to_singleton(homography_obj, frame, file_name='mask.jpg')
+    # _save_preview_to_singleton(homography_obj, frame, file_name='mask.jpg')
 
     for i, (key, point) in enumerate(homograph_points.items()):
         if i >= len(order_points):
@@ -479,192 +480,192 @@ def upload_calibration_video(request):
 
     return _run_homography_calibration(frame, payload)
 
-@csrf_exempt
-def upload_calibration_video_deprecated(request):
-    if request.method == 'POST' and request.FILES.get('video'):
-        video_file = request.FILES['video']
-        unit_distance = float(request.POST.get('square_size', 0.984252))
+# @csrf_exempt
+# def upload_calibration_video_deprecated(request):
+#     if request.method == 'POST' and request.FILES.get('video'):
+#         video_file = request.FILES['video']
+#         unit_distance = float(request.POST.get('square_size', 0.984252))
 
-        file_bytes = np.asarray(bytearray(video_file.read()), dtype=np.uint8)
-        cap = cv2.VideoCapture(cv2.CAP_FFMPEG)
-        cap.open(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR))
+#         file_bytes = np.asarray(bytearray(video_file.read()), dtype=np.uint8)
+#         cap = cv2.VideoCapture(cv2.CAP_FFMPEG)
+#         cap.open(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR))
 
-        if not cap.isOpened():
-            import tempfile
-            with tempfile.NamedTemporaryFile(suffix='.mp4') as temp:
-                temp.write(file_bytes)
-                temp.flush()
-                cap = cv2.VideoCapture(temp.name)
-                if not cap.isOpened():
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': 'Failed to read uploaded video'
-                    }, status=400)
+#         if not cap.isOpened():
+#             import tempfile
+#             with tempfile.NamedTemporaryFile(suffix='.mp4') as temp:
+#                 temp.write(file_bytes)
+#                 temp.flush()
+#                 cap = cv2.VideoCapture(temp.name)
+#                 if not cap.isOpened():
+#                     return JsonResponse({
+#                         'status': 'error',
+#                         'message': 'Failed to read uploaded video'
+#                     }, status=400)
 
-                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                middle_frame_index = total_frames // 2
-                cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
-                ret, frame = cap.read()
-                cap.release()
+#                 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+#                 middle_frame_index = total_frames // 2
+#                 cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
+#                 ret, frame = cap.read()
+#                 cap.release()
 
-        else:
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            middle_frame_index = total_frames // 2
-            cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
-            ret, frame = cap.read()
-            cap.release()
+#         else:
+#             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+#             middle_frame_index = total_frames // 2
+#             cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
+#             ret, frame = cap.read()
+#             cap.release()
 
-        if not ret or frame is None:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Could not extract frame from video'
-            }, status=400)
-        frame = cv2.resize(frame, (1280, 720))
-        cv2.imwrite("media/cal.jpg", frame)
-        # HSV mask logic (assume DEFAULT_HSV, TOL_H, TOL_S, TOL_V are defined)
-        hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        singleton = SingletonHomographicMatrixModel.load()
-        # Load HSV from model if set, else use DEFAULT_HSV
-        if singleton.hsv_value:  # will be {} if not set
-            h = singleton.hsv_value.get('h', DEFAULT_HSV[0])
-            s = singleton.hsv_value.get('s', DEFAULT_HSV[1])
-            v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
-        else:
-            h, s, v = DEFAULT_HSV
-        lower = np.array([max(h - TOL_H, 0), max(s - TOL_S, 0), max(v - TOL_V, 0)])
-        upper = np.array([min(h + TOL_H, 179), min(s + TOL_S, 255), min(v + TOL_V, 255)])
-        mask = cv2.inRange(hsv_frame, lower, upper)
+#         if not ret or frame is None:
+#             return JsonResponse({
+#                 'status': 'error',
+#                 'message': 'Could not extract frame from video'
+#             }, status=400)
+#         frame = cv2.resize(frame, (1280, 720))
+#         cv2.imwrite("media/cal.jpg", frame)
+#         # HSV mask logic (assume DEFAULT_HSV, TOL_H, TOL_S, TOL_V are defined)
+#         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+#         singleton = SingletonHomographicMatrixModel.load()
+#         # Load HSV from model if set, else use DEFAULT_HSV
+#         if singleton.hsv_value:  # will be {} if not set
+#             h = singleton.hsv_value.get('h', DEFAULT_HSV[0])
+#             s = singleton.hsv_value.get('s', DEFAULT_HSV[1])
+#             v = singleton.hsv_value.get('v', DEFAULT_HSV[2])
+#         else:
+#             h, s, v = DEFAULT_HSV
+#         lower = np.array([max(h - TOL_H, 0), max(s - TOL_S, 0), max(v - TOL_V, 0)])
+#         upper = np.array([min(h + TOL_H, 179), min(s + TOL_S, 255), min(v + TOL_V, 255)])
+#         mask = cv2.inRange(hsv_frame, lower, upper)
 
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        points = []
-        for cnt in contours:
-            M = cv2.moments(cnt)
-            if M["m00"] > 0:
-                cx = M["m10"] / M["m00"]
-                cy = M["m01"] / M["m00"]
-                points.append((cx, cy))
+#         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#         points = []
+#         for cnt in contours:
+#             M = cv2.moments(cnt)
+#             if M["m00"] > 0:
+#                 cx = M["m10"] / M["m00"]
+#                 cy = M["m01"] / M["m00"]
+#                 points.append((cx, cy))
 
-        points = merge_close_points(points, threshold=10)  # Your custom logic
-        points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
-        if len(points) < 4:
-            return JsonResponse({
-                'status': 'error',
-                'message': f'Failed to detect exactly 4 points. Detected: {len(points)}'
-            }, status=400)
-        cv2.imwrite("media/tihis.jpg", frame)
-        if len(points) < 6:
-            points = points_sorted[:4]
-            world_pts = np.array([
-                [0, 0],
-                [unit_distance, 0],
-                [unit_distance, unit_distance],
-                [0, unit_distance]
-            ], dtype=np.float32)
-        else:
-            points = points_sorted[:6]
-            world_pts = np.array([
-                [0, 0],
-                [unit_distance, 0],
-                [unit_distance + unit_distance, 0],
-                [unit_distance + unit_distance, unit_distance],
-                [unit_distance, unit_distance],
-                [0, unit_distance]
-            ], dtype=np.float32)
+#         points = merge_close_points(points, threshold=10)  # Your custom logic
+#         points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
+#         if len(points) < 4:
+#             return JsonResponse({
+#                 'status': 'error',
+#                 'message': f'Failed to detect exactly 4 points. Detected: {len(points)}'
+#             }, status=400)
+#         cv2.imwrite("media/tihis.jpg", frame)
+#         if len(points) < 6:
+#             points = points_sorted[:4]
+#             world_pts = np.array([
+#                 [0, 0],
+#                 [unit_distance, 0],
+#                 [unit_distance, unit_distance],
+#                 [0, unit_distance]
+#             ], dtype=np.float32)
+#         else:
+#             points = points_sorted[:6]
+#             world_pts = np.array([
+#                 [0, 0],
+#                 [unit_distance, 0],
+#                 [unit_distance + unit_distance, 0],
+#                 [unit_distance + unit_distance, unit_distance],
+#                 [unit_distance, unit_distance],
+#                 [0, unit_distance]
+#             ], dtype=np.float32)
 
-        order_points = np.array(order_points_anticlockwise(points))
+#         order_points = np.array(order_points_anticlockwise(points))
 
-        H, _ = cv2.findHomography(order_points, world_pts)
-        homography_matrix = H.tolist()
+#         H, _ = cv2.findHomography(order_points, world_pts)
+#         homography_matrix = H.tolist()
 
-        homography_obj = SingletonHomographicMatrixModel.load()
-        json_content = json.dumps(homography_matrix)
-        if homography_obj.matrix:
-            homography_obj.matrix.delete(save=False)
-        homography_obj.matrix.save(
-            'homography.json',
-            ContentFile(json_content),
-            save=False
-        )
-        homography_obj.unit_distance = unit_distance
+#         homography_obj = SingletonHomographicMatrixModel.load()
+#         json_content = json.dumps(homography_matrix)
+#         if homography_obj.matrix:
+#             homography_obj.matrix.delete(save=False)
+#         homography_obj.matrix.save(
+#             'homography.json',
+#             ContentFile(json_content),
+#             save=False
+#         )
+#         homography_obj.unit_distance = unit_distance
 
-        # Mark detected points on frame
-        for idx, (x, y) in enumerate(order_points):
-            cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), -1)
-            cv2.putText(
-                frame,
-                str(idx + 1),
-                (int(x) + 5, int(y) - 5),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (233, 0, 2),
-                1
-            )
-        _, buffer = cv2.imencode('.jpg', frame)
-        if homography_obj.file:
-            homography_obj.file.delete(save=False)
-        homography_obj.file.save(
-            'mask.jpg',
-            ContentFile(buffer.tobytes()),
-            save=True
-        )
+#         # Mark detected points on frame
+#         for idx, (x, y) in enumerate(order_points):
+#             cv2.circle(frame, (int(x), int(y)), 6, (0, 0, 255), -1)
+#             cv2.putText(
+#                 frame,
+#                 str(idx + 1),
+#                 (int(x) + 5, int(y) - 5),
+#                 cv2.FONT_HERSHEY_SIMPLEX,
+#                 0.5,
+#                 (233, 0, 2),
+#                 1
+#             )
+#         _, buffer = cv2.imencode('.jpg', frame)
+#         if homography_obj.file:
+#             homography_obj.file.delete(save=False)
+#         homography_obj.file.save(
+#             'mask.jpg',
+#             ContentFile(buffer.tobytes()),
+#             save=True
+#         )
 
-        homography_obj.save()
+#         homography_obj.save()
 
-        return JsonResponse({
-            'status': 'success',
-        })
+#         return JsonResponse({
+#             'status': 'success',
+#         })
 
-    return JsonResponse({
-        'status': 'error',
-        'message': 'No image uploaded'
-    }, status=400)
+#     return JsonResponse({
+#         'status': 'error',
+#         'message': 'No image uploaded'
+#     }, status=400)
 
 
-@csrf_exempt
-def process_image(request):
-    """
-    Recieves an image and coorinate of point on image, stores the color of that point
-    """
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+# @csrf_exempt
+# def process_image(request):
+#     """
+#     DO NOT USE THIS ENDPOINT. This was an experimental endpoint to test HSV based color detection for calibration and is now deprecated. It may be removed in future releases.
+#     """
+#     if request.method != 'POST':
+#         return JsonResponse({'error': 'Only POST allowed'}, status=405)
 
-    try:
-        img_file = request.FILES['image']
-        x = int(request.POST['x'])
-        y = int(request.POST['y'])
-        print(x, y)
-        file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        if img is None:
-            return JsonResponse({'error': 'Invalid image'}, status=400)
-        print(img.shape)
-        cv2.imwrite("media/ths.jpg", img)
-        hsv_frame = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        h, s, v = hsv_frame[y, x]
-        h, s, v = int(h), int(s), int(v)
-        lower = np.array([max(h - TOL_H, 0), max(s - TOL_S, 0), max(v - TOL_V, 0)])
-        upper = np.array([min(h + TOL_H, 179), min(s + TOL_S, 255), min(v + TOL_V, 255)])
-        mask = cv2.inRange(hsv_frame, lower, upper)
-        highlight = cv2.convertScaleAbs(img, alpha=1.8, beta=40)
-        output_img = img.copy()
-        output_img[mask > 0] = highlight[mask > 0]
-        cv2.circle(output_img, (x, y), 4, (25, 48, 228), -1)
-        cv2.imwrite("media/this.jpg", output_img)
-        _, buffer = cv2.imencode('.jpg', output_img)
-        encoded_image = base64.b64encode(buffer).decode('utf-8')
+#     try:
+#         img_file = request.FILES['image']
+#         x = int(request.POST['x'])
+#         y = int(request.POST['y'])
+#         print(x, y)
+#         file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
+#         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+#         if img is None:
+#             return JsonResponse({'error': 'Invalid image'}, status=400)
+#         print(img.shape)
+#         cv2.imwrite("media/ths.jpg", img)
+#         hsv_frame = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+#         h, s, v = hsv_frame[y, x]
+#         h, s, v = int(h), int(s), int(v)
+#         lower = np.array([max(h - TOL_H, 0), max(s - TOL_S, 0), max(v - TOL_V, 0)])
+#         upper = np.array([min(h + TOL_H, 179), min(s + TOL_S, 255), min(v + TOL_V, 255)])
+#         mask = cv2.inRange(hsv_frame, lower, upper)
+#         highlight = cv2.convertScaleAbs(img, alpha=1.8, beta=40)
+#         output_img = img.copy()
+#         output_img[mask > 0] = highlight[mask > 0]
+#         cv2.circle(output_img, (x, y), 4, (25, 48, 228), -1)
+#         cv2.imwrite("media/this.jpg", output_img)
+#         _, buffer = cv2.imencode('.jpg', output_img)
+#         encoded_image = base64.b64encode(buffer).decode('utf-8')
 
-        singleton = SingletonHomographicMatrixModel.load()
-        singleton.hsv_value = {'h': int(h), 's': int(s), 'v': int(v)}
-        singleton.tracker_hsv_value = {'h': int(h), 's': int(s), 'v': int(v)}
-        singleton.save()
+#         singleton = SingletonHomographicMatrixModel.load()
+#         singleton.hsv_value = {'h': int(h), 's': int(s), 'v': int(v)}
+#         singleton.tracker_hsv_value = {'h': int(h), 's': int(s), 'v': int(v)}
+#         singleton.save()
 
-        return JsonResponse({
-            'hsv': {'h': int(h), 's': int(s), 'v': int(v)},
-            'image_base64': f"data:image/jpeg;base64,{encoded_image}"
-        })
+#         return JsonResponse({
+#             'hsv': {'h': int(h), 's': int(s), 'v': int(v)},
+#             'image_base64': f"data:image/jpeg;base64,{encoded_image}"
+#         })
 
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=500)
 
 
 def list_videos_by_assessment_and_test(request):
@@ -803,23 +804,23 @@ def get_video_detail(request):
 #         return JsonResponse({'status': 'error', 'message': 'Video not found'}, status=404)
 
 
-def get_homograph(request):
-    test_id = request.GET.get('test_id', "not_sit_and_reach")
-    homograph_obj = SingletonHomographicMatrixModel.load()
-    if test_id != "vPbXoPK4" and test_id != "BwbJyXKl":
-        response_data = {
-            'square_size': homograph_obj.unit_distance,
-            'matrix_url': homograph_obj.matrix.url if homograph_obj.matrix else "",
-            'image_url': homograph_obj.file.url if homograph_obj.file else "",
-        }
-    else:
-        response_data = {
-            'square_size': homograph_obj.unit_distance,
-            'matrix_url': homograph_obj.matrix.url if homograph_obj.matrix else "",
-            'image_url': homograph_obj.mask.url if homograph_obj.mask else "",
-        }
-    return JsonResponse({
-        'status' : 'success',
-        'calibration_info': response_data
-    })
+# def get_homograph(request):
+#     test_id = request.GET.get('test_id', "not_sit_and_reach")
+#     homograph_obj = SingletonHomographicMatrixModel.load()
+#     if test_id != "vPbXoPK4" and test_id != "BwbJyXKl":
+#         response_data = {
+#             'square_size': homograph_obj.unit_distance,
+#             'matrix_url': homograph_obj.matrix.url if homograph_obj.matrix else "",
+#             'image_url': homograph_obj.file.url if homograph_obj.file else "",
+#         }
+#     else:
+#         response_data = {
+#             'square_size': homograph_obj.unit_distance,
+#             'matrix_url': homograph_obj.matrix.url if homograph_obj.matrix else "",
+#             'image_url': homograph_obj.mask.url if homograph_obj.mask else "",
+#         }
+#     return JsonResponse({
+#         'status' : 'success',
+#         'calibration_info': response_data
+#     })
 
