@@ -175,25 +175,31 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+            'format': '{levelname} {asctime} {module} {funcName} {message}',
             'style': '{',
         },
     },
     'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+        'app_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'app.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 3,
             'formatter': 'verbose',
         },
     },
     'loggers': {
-        'homography_app': {  # use your app name here
-            'handlers': ['console'],
+        'homography_app': {
+            'handlers': ['app_file'],
             'level': 'INFO',
+            'propagate': False,  # don't bubble up to root/server logger
         },
     },
 }

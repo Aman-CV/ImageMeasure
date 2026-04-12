@@ -131,13 +131,13 @@ def download_and_save_video(obj):
 @background(schedule=0, remove_existing_tasks=True)
 def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     if test_id == "" or assessment_id == "":
-        logger.info(f"[process_video_task] INVALID TEST/ASSESSMENT ID: {petvideo_id}")
+        logger.error(f"sit_and_throw: missing test_id or assessment_id (video={petvideo_id})")
         return
-    logger.info(f"[process_video_task] Starting processing for PetVideo ID: {petvideo_id}")
+    logger.info(f"sit_and_throw started: video={petvideo_id} test={test_id} assessment={assessment_id}")
     try:
         video_obj = PetVideos.objects.get(id=petvideo_id)
     except PetVideos.DoesNotExist:
-        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        logger.error(f"sit_and_throw: PetVideo {petvideo_id} not found in DB")
         return
     # if not video_obj.to_be_processed:
     #     with open(video_obj.file.path, 'rb') as f:
@@ -164,7 +164,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         cx, cy, cf = get_first_bounce_frame_MOG(video_path,
                     start_cutoff=(homograph_obj.origin_x + 10.0)/1280.0 if homograph_obj.start_pixel !=0 else 0.25, video_obj=video_obj, output_pth=opth)
         if cx is None or cy is None:
-            logger.error(f"[process_sit_and_throw] Error in detecting ball: {petvideo_id}")
+            logger.error(f"sit_and_throw: ball peak not detected for video {petvideo_id}")
             # video_obj.distance = 0
             video_obj.is_video_processed = True
             video_obj.progress = 100
@@ -201,23 +201,23 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         video_obj.save()
 
         test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
-        logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
+        logger.info(f"sit_and_throw done: video={petvideo_id} distance={round(distance, 3)}m")
 
     except Exception as e:
-        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+        logger.error(f"sit_and_throw failed: video={petvideo_id} — {e}", exc_info=True)
 
 
 @background(schedule=0, remove_existing_tasks=True)
 def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
     if len(test_id) == 0 or len(assessment_id) == 0:
-        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
+        logger.error(f"sit_and_reach: missing test_id or assessment_id (video={petvideo_id})")
         return
     if test_id == "vPbXoPK4" or test_id == "reach":
-        logger.info(f"[process_video_task] Starting processing for PetVideo ID (Sit and reach variant): {petvideo_id}")
+        logger.info(f"sit_and_reach started: video={petvideo_id} test={test_id} assessment={assessment_id}")
         try:
             video_obj = PetVideos.objects.get(id=petvideo_id)
         except PetVideos.DoesNotExist:
-            logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+            logger.error(f"sit_and_reach: PetVideo {petvideo_id} not found in DB")
             return
         video_path = _ensure_local_video(video_obj)
 
@@ -264,7 +264,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=False)
 
             if not distance:
-                logger.info(f"[process_video_task] Finger tip detection failed: {petvideo_id}")
+                logger.warning(f"sit_and_reach: fingertip not detected for video {petvideo_id}")
             else:
                 print(distance)
             is_changed = False
@@ -279,25 +279,23 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             _remove_files(opth)
             _cleanup_local_video(video_obj)
             test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
-            logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
+            logger.info(f"sit_and_reach done: video={petvideo_id} distance={round(distance, 3) if distance else 'N/A'}m")
 
         except Exception as e:
-            logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+            logger.error(f"sit_and_reach failed: video={petvideo_id} — {e}", exc_info=True)
         return
 
 
 @background(schedule=0, remove_existing_tasks=True)
 def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id=""):
     if test_id == "" or assessment_id == "":
-        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
+        logger.error(f"broad_jump: missing test_id or assessment_id (video={petvideo_id})")
         return
-    logger.info(f"[process_video_task] Starting processing for PetVideo ID: {petvideo_id}")
-    logger.info(f"[process_video_task] color_marker_tracking is {enable_color_marker_tracking}")
-    logger.info(f"[process_video_task] jump detection is {enable_start_end_detector}")
+    logger.info(f"broad_jump started: video={petvideo_id} test={test_id} assessment={assessment_id} color_marker={enable_color_marker_tracking} jump_detect={enable_start_end_detector}")
     try:
         video_obj = PetVideos.objects.get(id=petvideo_id)
     except PetVideos.DoesNotExist:
-        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        logger.error(f"broad_jump: PetVideo {petvideo_id} not found in DB")
         return
     if not video_obj.to_be_processed:
         # ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
@@ -319,7 +317,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         # if os.path.exists(file_path):
         #     os.remove(file_path)
         # test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
-        logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
+        logger.info(f"broad_jump: video {petvideo_id} flagged to skip processing")
         return
     video_path = _ensure_local_video(video_obj)
     original_name = os.path.basename(video_obj.file.name)
@@ -395,7 +393,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         success, [f1, f2] = get_flat_start(dy, window=len(dy) // 10)
         print(f1, f2)
         if not success:
-            logger.info(f"[process_video_task] Info processing PetVideo ID {petvideo_id}: flats not deteced")
+            logger.warning(f"broad_jump: flat start not detected for video {petvideo_id}, using full trajectory")
         start, end = detect_biggest_jump(dy[f1[1]: f2[1]] if success else dy)
 
         if success and start and end and enable_start_end_detector:
@@ -520,10 +518,10 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         _cleanup_local_video(video_obj)
         _remove_files(temp_output_path, final_output_path)
         test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
-        logger.info(f"[process_video_task] Finished processing PetVideo ID: {petvideo_id}")
+        logger.info(f"broad_jump done: video={petvideo_id} distance={round(distance_ft, 3)}m")
 
     except Exception as e:
-        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+        logger.error(f"broad_jump failed: video={petvideo_id} — {e}", exc_info=True)
 
 
 @background(schedule=0, remove_existing_tasks=True)
@@ -605,14 +603,14 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
 
 @background(schedule=0, remove_existing_tasks=True)
 def process_plank(petvideo_id, test_id, assessment_id):
-    logger.info(f"[process_video_task] STARTED PLANK/ ASSESSMENT ID: {petvideo_id}")
     if test_id == "" or assessment_id == "":
-        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
+        logger.error(f"plank: missing test_id or assessment_id (video={petvideo_id})")
         return
+    logger.info(f"plank started: video={petvideo_id} test={test_id} assessment={assessment_id}")
     try:
         video_obj = PetVideos.objects.get(id=petvideo_id)
     except PetVideos.DoesNotExist:
-        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        logger.error(f"plank: PetVideo {petvideo_id} not found in DB")
         return
     # if not video_obj.to_be_processed:
     #     with open(video_obj.file.path, 'rb') as f:
@@ -650,21 +648,21 @@ def process_plank(petvideo_id, test_id, assessment_id):
         _remove_files(opth)
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id,
                        vurl=video_obj.processed_file.url)
-        logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
+        logger.info(f"plank done: video={petvideo_id}")
 
     except Exception as e:
-        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+        logger.error(f"plank failed: video={petvideo_id} — {e}", exc_info=True)
 
 
 def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
-    logger.info(f"[process_video_task] STARTED TEST (runs) / ASSESSMENT ID: {petvideo_id}")
     if test_id == "" or assessment_id == "":
-        logger.info(f"[process_video_task] INVALID TEST/ ASSESSMENT ID: {petvideo_id}")
+        logger.error(f"6x15_dash: missing test_id or assessment_id (video={petvideo_id})")
         return
+    logger.info(f"6x15_dash started: video={petvideo_id} test={test_id} assessment={assessment_id}")
     try:
         video_obj = PetVideos.objects.get(id=petvideo_id)
     except PetVideos.DoesNotExist:
-        logger.error(f"[process_video_task] PetVideo ID {petvideo_id} does not exist")
+        logger.error(f"6x15_dash: PetVideo {petvideo_id} not found in DB")
         return
     # if not video_obj.to_be_processed:
     #     with open(video_obj.file.path, 'rb') as f:
@@ -688,7 +686,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         ).first()
         use_homograph = False
         if not homograph_obj:
-            logger.info(f"[process_video_task] Not calibrated {petvideo_id}")
+            logger.error(f"6x15_dash: no calibration data for video={petvideo_id} test={test_id}")
             return
 
         #fno, duration, _ = detect_crossing_rightmost_ankle(video_path, homograph_obj.end_pixel, reference=homograph_obj.unit_distance,show=False)
@@ -700,7 +698,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         opth = f"motion_output_{petvideo_id}.mp4"
         is_changed = False
         if duration < 0.5:
-            logger.info(f"[process_video_task] Detection started {petvideo_id}")
+            logger.info(f"6x15_dash: running crossing detector for video {petvideo_id}")
             fpx = [homograph_obj.origin_x, homograph_obj.origin_y]
             if homograph_obj.origin_x == 0 and homograph_obj == 0:
                 fpx = [homograph_obj.end_pixel, None]
@@ -717,7 +715,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
                     video_obj.progress = 100
                     video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
                 _cleanup_local_video(video_obj)
-                logger.info(f"[process_video_task] Detection failed {petvideo_id}")
+                logger.warning(f"6x15_dash: crossing not detected for video {petvideo_id}, keeping original file")
                 return
         video_obj.distance = homograph_obj.unit_distance
         video_obj.is_video_processed = True
@@ -729,8 +727,8 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         _cleanup_local_video(video_obj)
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
-        logger.info(f"[process_video_task] Done processing PetVideo ID {petvideo_id}")
+        logger.info(f"6x15_dash done: video={petvideo_id} duration={round(duration - 3.5, 3)}s")
 
     except Exception as e:
-        logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
+        logger.error(f"6x15_dash failed: video={petvideo_id} — {e}", exc_info=True)
 

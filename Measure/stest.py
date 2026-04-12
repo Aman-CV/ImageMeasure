@@ -1,8 +1,6 @@
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
+import torch
+import torchvision
 
-print(default_storage.__class__)
-default_storage.save("django5.txt", ContentFile("fixed"))
-
-url = default_storage.url("django5.txt")
-print(url)
+print(torch.__version__)
+print(torchvision.__version__)
+print(torch.cuda.is_available())

@@ -1,8 +1,11 @@
+import logging
 import numpy as np
 import cv2
 from ultralytics import YOLO
 from scipy.signal import medfilt
 from scipy.ndimage import gaussian_filter1d
+
+logger = logging.getLogger('homography_app')
 
 
 
@@ -65,7 +68,7 @@ def analyze_positions(positions):
             peaks.append(i)
 
     if len(peaks) == 0:
-        print("No peak detected in second half, using global max.")
+        logger.warning("sit_and_throw: no peak detected in second half, falling back to global max")
         peak_idx_local = np.argmax(y)
     else:
         peak_idx_local = peaks[0]
@@ -181,8 +184,6 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None, output_pth
     cap.release()
     out.release()
 
-    print("Saved output video: motion_output.mp4")
-
     positions = np.array(positions)
 
     peak_frame, peak_x, peak_y = analyze_positions(positions)
@@ -295,8 +296,6 @@ def get_first_bounce_frame(inp):
 
 
             if frame_no >= half_point:
-                if frame_no == 69:
-                    print(cx, positions[-1], positions[-2])
                 positions.append([frame_no, cy, cx])
 
         gray1 = gray2.copy()
@@ -348,7 +347,6 @@ def get_first_bounce_frame(inp):
         selected_y = float(y_vals[selected_idx])
         selected_x = 0.5 * (x_vals[selected_idx + 1] + x_vals[selected_idx])
 
-        print(x_vals[selected_idx], x_vals[selected_idx + 1] )
         return selected_x, selected_y, selected_frame
 
     else:
