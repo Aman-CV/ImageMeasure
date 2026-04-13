@@ -181,22 +181,17 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         logger.error(f"sit_and_throw: missing test_id or assessment_id (video={petvideo_id})")
         return
     
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"sit_and_throw: PetVideo {petvideo_id} not found in DB")
+        return
+    
+    video_path = _ensure_local_video(video_obj)
+    
     with ResourceMonitorContext('sit_and_throw', petvideo_id) as monitor:
         logger.info(f"sit_and_throw started: video={petvideo_id} test={test_id} assessment={assessment_id}")
-        try:
-            video_obj = PetVideos.objects.get(id=petvideo_id)
-        except PetVideos.DoesNotExist:
-            logger.error(f"sit_and_throw: PetVideo {petvideo_id} not found in DB")
-            return
-        # if not video_obj.to_be_processed:
-        #     with open(video_obj.file.path, 'rb') as f:
-        #         video_obj.is_video_processed = True
-        #         video_obj.progress = 100
-        #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
-        #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
-        #     return
-        video_path = _ensure_local_video(video_obj)
-
+        
         output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
         os.makedirs(output_dir, exist_ok=True)
         try:
@@ -265,15 +260,16 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
         logger.error(f"sit_and_reach: missing test_id or assessment_id (video={petvideo_id})")
         return
     if test_id == "vPbXoPK4" or test_id == "reach":
+        try:
+            video_obj = PetVideos.objects.get(id=petvideo_id)
+        except PetVideos.DoesNotExist:
+            logger.error(f"sit_and_reach: PetVideo {petvideo_id} not found in DB")
+            return
+        
+        video_path = _ensure_local_video(video_obj)
+        
         with ResourceMonitorContext('sit_and_reach', petvideo_id) as monitor:
             logger.info(f"sit_and_reach started: video={petvideo_id} test={test_id} assessment={assessment_id}")
-            try:
-                video_obj = PetVideos.objects.get(id=petvideo_id)
-            except PetVideos.DoesNotExist:
-                logger.error(f"sit_and_reach: PetVideo {petvideo_id} not found in DB")
-                return
-            video_path = _ensure_local_video(video_obj)
-
             try:
                 video_obj.is_video_processed = False
                 video_obj.progress = 0
@@ -347,25 +343,27 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         logger.error(f"broad_jump: missing test_id or assessment_id (video={petvideo_id})")
         return
     
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"broad_jump: PetVideo {petvideo_id} not found in DB")
+        return
+    if not video_obj.to_be_processed:
+        logger.info(f"broad_jump: video {petvideo_id} flagged to skip processing")
+        return
+    
+    video_path = _ensure_local_video(video_obj)
+    
     with ResourceMonitorContext('broad_jump', petvideo_id) as monitor:
         logger.info(f"broad_jump started: video={petvideo_id} test={test_id} assessment={assessment_id} color_marker={enable_color_marker_tracking} jump_detect={enable_start_end_detector}")
         try:
-            video_obj = PetVideos.objects.get(id=petvideo_id)
-        except PetVideos.DoesNotExist:
-            logger.error(f"broad_jump: PetVideo {petvideo_id} not found in DB")
-            return
-        if not video_obj.to_be_processed:
-            logger.info(f"broad_jump: video {petvideo_id} flagged to skip processing")
-            return
-        video_path = _ensure_local_video(video_obj)
-        original_name = os.path.basename(video_obj.file.name)
+            original_name = os.path.basename(video_obj.file.name)
 
-        output_dir = "temp_media_store"
-        os.makedirs(output_dir, exist_ok=True)
+            output_dir = "temp_media_store"
+            os.makedirs(output_dir, exist_ok=True)
 
-        temp_output_path = os.path.join(output_dir, f"temp_{original_name}")
-        final_output_path = os.path.join(output_dir, f"processed_{original_name}")
-        try:
+            temp_output_path = os.path.join(output_dir, f"temp_{original_name}")
+            final_output_path = os.path.join(output_dir, f"processed_{original_name}")
             cap = cv2.VideoCapture(video_path)
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             fps = cap.get(cv2.CAP_PROP_FPS) or 30
@@ -614,21 +612,23 @@ def process_plank(petvideo_id, test_id, assessment_id):
         logger.error(f"plank: missing test_id or assessment_id (video={petvideo_id})")
         return
     
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"plank: PetVideo {petvideo_id} not found in DB")
+        return
+    
+    video_path = _ensure_local_video(video_obj)
+    
     with ResourceMonitorContext('plank', petvideo_id) as monitor:
         logger.info(f"plank started: video={petvideo_id} test={test_id} assessment={assessment_id}")
         try:
-            video_obj = PetVideos.objects.get(id=petvideo_id)
-        except PetVideos.DoesNotExist:
-            logger.error(f"plank: PetVideo {petvideo_id} not found in DB")
-            return
-        video_path = _ensure_local_video(video_obj)
-        if video_obj.processed_file:
-            video_obj.processed_file.delete(save=False)
-            video_obj.processed_file = None
+            if video_obj.processed_file:
+                video_obj.processed_file.delete(save=False)
+                video_obj.processed_file = None
 
-        output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
-        os.makedirs(output_dir, exist_ok=True)
-        try:
+            output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
+            os.makedirs(output_dir, exist_ok=True)
             video_obj.is_video_processed = False
             video_obj.progress = 0
 
@@ -661,19 +661,19 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         logger.error(f"6x15_dash: missing test_id or assessment_id (video={petvideo_id})")
         return
     
+    try:
+        video_obj = PetVideos.objects.get(id=petvideo_id)
+    except PetVideos.DoesNotExist:
+        logger.error(f"6x15_dash: PetVideo {petvideo_id} not found in DB")
+        return
+
+    video_path = _ensure_local_video(video_obj)
+    
     with ResourceMonitorContext('6x15_dash', petvideo_id) as monitor:
         logger.info(f"6x15_dash started: video={petvideo_id} test={test_id} assessment={assessment_id}")
         try:
-            video_obj = PetVideos.objects.get(id=petvideo_id)
-        except PetVideos.DoesNotExist:
-            logger.error(f"6x15_dash: PetVideo {petvideo_id} not found in DB")
-            return
-
-        video_path = _ensure_local_video(video_obj)
-
-        output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
-        os.makedirs(output_dir, exist_ok=True)
-        try:
+            output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
+            os.makedirs(output_dir, exist_ok=True)
             video_obj.is_video_processed = False
             video_obj.progress = 0
             homograph_obj = CalibrationDataModel.objects.filter(

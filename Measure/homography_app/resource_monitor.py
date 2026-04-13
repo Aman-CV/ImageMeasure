@@ -154,7 +154,7 @@ class ResourceMonitor:
         """Save metrics to CSV file for cost analysis."""
         metrics_file = os.path.join(
             os.path.dirname(__file__),
-            '..', '..', 'logs',
+            '..', 'logs',
             'resource_metrics.csv'
         )
         
