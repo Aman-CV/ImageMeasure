@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from ultralytics import YOLO
+from .config import get_device
 
 
 import numpy as np
@@ -78,6 +79,7 @@ def mark_right_side_pose(
     video_obj=None
 ):
     model = YOLO(model_path)
+    model.to(get_device())
 
     cap = cv2.VideoCapture(video_path)
     assert cap.isOpened(), "Failed to open video"

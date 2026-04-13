@@ -1,5 +1,6 @@
 import cv2
 from ultralytics import YOLO
+from .config import get_device
 
 def detect_crossing_rightmost_ankle(
     video_path,
@@ -17,6 +18,7 @@ def detect_crossing_rightmost_ankle(
     meters_per_pixel = None
 
     model = YOLO("yolov8m-pose.pt")
+    model.to(get_device())
     cap = cv2.VideoCapture(video_path)
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -155,6 +157,7 @@ def detect_crossing_person_box(
     reference=15,
 ):
     model = YOLO("yolov8m.pt")
+    model.to(get_device())
     cap = cv2.VideoCapture(video_path)
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -298,6 +301,7 @@ def detect_crossing_person_box_reverse_nobuffer(
     video_obj=None,
 ):
     model = YOLO("yolov8x.pt")
+    model.to(get_device())
     cap = cv2.VideoCapture(video_path)
 
     fps = cap.get(cv2.CAP_PROP_FPS)

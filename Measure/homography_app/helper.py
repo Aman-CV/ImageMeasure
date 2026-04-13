@@ -14,6 +14,7 @@ import os
 import torch
 import numpy as np
 from segment_anything import sam_model_registry, SamPredictor
+from .config import get_torch_device
 
 load_dotenv()
 
@@ -885,7 +886,7 @@ def segment_object_sam(
 
     # ---- Device ----
     if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = get_torch_device()
 
     # ---- Load SAM ----
     sam = sam_model_registry["vit_b"](checkpoint=checkpoint)

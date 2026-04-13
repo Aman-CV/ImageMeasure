@@ -3,6 +3,7 @@ import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+from .config import CPU_ONLY
 from pathlib import Path
 
 def estimate_distance_between_points(centers, known_distance_cm=15):
@@ -170,7 +171,8 @@ def middle_finger_movement_distance(video_path, show=False, debug=True, video_ob
     current_dir = Path(__file__).parent
     task_path = current_dir / "hand_landmarker.task"
     base_options = python.BaseOptions(
-        model_asset_path=str(task_path)
+        model_asset_path=str(task_path),
+        delegate=python.BaseOptions.Delegate.CPU if CPU_ONLY else python.BaseOptions.Delegate.GPU
     )
 
     options = vision.HandLandmarkerOptions(

@@ -21,6 +21,7 @@ from .plank_helper import mark_right_side_pose
 from .sit_and_reach_helper_ import middle_finger_movement_distance
 from .sit_and_throw_helper import get_first_bounce_frame_MOG
 from .resource_monitor import ResourceMonitorContext
+from .config import get_device
 
 logger = logging.getLogger('homography_app')
 
@@ -375,6 +376,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             trajectory = []
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             model = YOLO("yolov8m-pose.pt")
+            model.to(get_device())
             current_frame = 0
             last_logged_progress = 0
             while True:

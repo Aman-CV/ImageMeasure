@@ -4,6 +4,7 @@ import cv2
 from ultralytics import YOLO
 from scipy.signal import medfilt
 from scipy.ndimage import gaussian_filter1d
+from .config import get_device
 
 logger = logging.getLogger('homography_app')
 
@@ -108,6 +109,7 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None, output_pth
     frame_no = 0
     positions = []
     model = YOLO("yolov8x.pt")  # pre-trained on COCO dataset
+    model.to(get_device())
     use_ai = True
     while True:
         ret, frame0 = cap.read()
