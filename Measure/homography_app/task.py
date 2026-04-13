@@ -42,15 +42,60 @@ def _cleanup_local_video(video_obj):
     _remove_files(_legacy_video_path(video_obj), _canonical_video_path(video_obj))
 
 
-def _encode_to_h264(input_path, output_path):
-    subprocess.run([
-        'ffmpeg', '-i', input_path,  "-loglevel", "error",
+def _encode_to_h264(input_path, output_path, resolution=None, fps=None):
+    """Encode video to H.264.
+    
+    Args:
+        input_path: Path to input video
+        output_path: Path to output video
+        resolution: Optional string like '360p' or tuple (width, height). If None, keeps original.
+        fps: Optional frames per second. If None, keeps original.
+    """
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Input video not found: {input_path}")
+    
+    # Build video filter string
+    vf_filters = []
+    
+    if resolution:
+        try:
+            if isinstance(resolution, str) and resolution.endswith('p'):
+                # Handle "360p" format - maintain aspect ratio
+                height = int(resolution[:-1])
+                vf_filters.append(f'scale=-1:{height}')
+            elif isinstance(resolution, tuple):
+                width, height = resolution
+                vf_filters.append(f'scale={width}:{height}')
+        except (ValueError, IndexError) as e:
+            raise ValueError(f"Invalid resolution format: {resolution}") from e
+    
+    if fps:
+        try:
+            vf_filters.append(f'fps={int(fps)}')
+        except ValueError:
+            raise ValueError(f"Invalid fps value: {fps}")
+    
+    # Build command
+    cmd = [
+        'ffmpeg', '-i', input_path, "-loglevel", "error",
+    ]
+    
+    # Add video filters if any
+    if vf_filters:
+        cmd.extend(['-vf', ','.join(vf_filters)])
+    
+    cmd.extend([
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-c:a', 'aac', '-movflags', '+faststart', '-y',
-        output_path
-    ],     check=True,
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL)
+        '-c:a', 'aac', '-movflags', '+faststart',
+        '-y', output_path
+    ])
+    
+    try:
+        subprocess.run(cmd, check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"FFmpeg encoding failed: {e}")
 
 
 def _ensure_local_video(video_obj):
@@ -193,9 +238,12 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
 
         final_output_path = f"temp_media_store/processed_{original_name}"
 
-        _encode_to_h264(opth, final_output_path)
         if is_changed:
+            # Apply low-quality encoding (360p, 15fps) only to files being saved
+            _encode_to_h264(opth, final_output_path, resolution='360p', fps=15)
             _save_processed_file(video_obj, final_output_path, original_name)
+        else:
+            _encode_to_h264(opth, final_output_path)
         _remove_files(final_output_path, opth)
         _cleanup_local_video(video_obj)
         video_obj.save()
@@ -256,8 +304,6 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             original_name = os.path.basename(video_obj.file.name)
             final_output_path = f"temp_media_store/processed_{original_name}"
 
-            _encode_to_h264(opth, final_output_path)
-
 
             #----#
             #with open(video_path, 'rb') as f:
@@ -271,7 +317,11 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             if distance:
                 is_changed = video_obj.update_metrix(0, distance)
             if is_changed:
+                # Apply low-quality encoding (360p, 15fps) only to files being saved
+                _encode_to_h264(opth, final_output_path, resolution='360p', fps=15)
                 _save_processed_file(video_obj, final_output_path, original_name)
+            else:
+                _encode_to_h264(opth, final_output_path)
             _remove_files(final_output_path)
             video_obj.is_video_processed = True
             video_obj.progress = 100
@@ -504,16 +554,17 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         cap.release()
         out.release()
         # --- ffmpeg encode ---
-        _encode_to_h264(temp_output_path, final_output_path)
-
-
 
         # video_obj.distance = distance_ft
         video_obj.is_video_processed = True
         video_obj.progress = 100
         is_changed = video_obj.update_metrix(0, distance_ft)
         if is_changed:
+            # Apply low-quality encoding (360p, 15fps) only to files being saved
+            _encode_to_h264(temp_output_path, final_output_path, resolution='360p', fps=15)
             _save_processed_file(video_obj, final_output_path, original_name)
+        else:
+            _encode_to_h264(temp_output_path, final_output_path)
         video_obj.save()
         _cleanup_local_video(video_obj)
         _remove_files(temp_output_path, final_output_path)
@@ -639,7 +690,8 @@ def process_plank(petvideo_id, test_id, assessment_id):
         video_obj.distance = 0.0
         video_obj.is_video_processed = True
         video_obj.progress = 100
-        _encode_to_h264(opth, final_output_path)
+        # Apply low-quality encoding (360p, 15fps) only to files being saved
+        _encode_to_h264(opth, final_output_path, resolution='360p', fps=15)
 
         _save_processed_file(video_obj, final_output_path, original_name)
         _remove_files(final_output_path)
@@ -720,9 +772,12 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         video_obj.distance = homograph_obj.unit_distance
         video_obj.is_video_processed = True
         video_obj.progress = 100
-        _encode_to_h264(opth, final_output_path)
         if is_changed:
+            # Apply low-quality encoding (360p, 15fps) only to files being saved
+            _encode_to_h264(opth, final_output_path, resolution='360p', fps=15)
             _save_processed_file(video_obj, final_output_path, original_name)
+        else:
+            _encode_to_h264(opth, final_output_path)
         _remove_files(final_output_path, opth)
         _cleanup_local_video(video_obj)
         video_obj.save()

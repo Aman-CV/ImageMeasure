@@ -324,6 +324,7 @@ def detect_crossing_person_box_reverse_nobuffer(
             persist=True,
             conf=conf,
             classes=[0],
+            imgsz=360,
             verbose=False
         )
 
