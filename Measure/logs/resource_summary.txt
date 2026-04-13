@@ -1,0 +1,78 @@
+
+================================================================================
+AWS RESOURCE ANALYSIS REPORT
+================================================================================
+
+
+Task: 6x15_dash
+  Executions: 1
+  Total Duration: 74.20 seconds (0.0206 hours)
+  
+Memory Usage:
+    CPU Average: 788.66 MB
+    CPU Peak: 1596.49 MB
+    GPU Average: 52.33 MB
+    GPU Peak: 261.87 MB
+  CPU Utilization: 27.2%
+
+Task: broad_jump
+  Executions: 1
+  Total Duration: 48.77 seconds (0.0135 hours)
+  
+Memory Usage:
+    CPU Average: 1584.69 MB
+    CPU Peak: 1620.72 MB
+    GPU Average: 295.01 MB
+    GPU Peak: 378.78 MB
+  CPU Utilization: 20.2%
+
+Task: plank
+  Executions: 1
+  Total Duration: 10.59 seconds (0.0029 hours)
+  
+Memory Usage:
+    CPU Average: 1468.32 MB
+    CPU Peak: 1498.73 MB
+    GPU Average: 385.97 MB
+    GPU Peak: 467.45 MB
+  CPU Utilization: 20.0%
+
+Task: sit_and_reach
+  Executions: 1
+  Total Duration: 25.44 seconds (0.0071 hours)
+  
+Memory Usage:
+    CPU Average: 1626.29 MB
+    CPU Peak: 1745.73 MB
+    GPU Average: 261.91 MB
+    GPU Peak: 261.91 MB
+  CPU Utilization: 29.8%
+
+Task: sit_and_throw
+  Executions: 1
+  Total Duration: 31.88 seconds (0.0089 hours)
+  
+Memory Usage:
+    CPU Average: 864.03 MB
+    CPU Peak: 1747.19 MB
+    GPU Average: 71.66 MB
+    GPU Peak: 289.16 MB
+  CPU Utilization: 35.2%
+
+--------------------------------------------------------------------------------
+COST ESTIMATION
+--------------------------------------------------------------------------------
+
+CPU Instance Hours: 0.0530 hours
+  Estimated Cost: $0.00
+
+GPU Instance Hours: 0.0530 hours
+  Estimated Cost: $0.02
+
+Total Estimated Cost: $0.02
+Cost per Video: $0.0038
+
+================================================================================
+
+
+Generated: 2026-04-13T13:35:57.231742
