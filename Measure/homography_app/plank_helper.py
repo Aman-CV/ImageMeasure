@@ -7,6 +7,63 @@ from .config import get_device
 import numpy as np
 
 
+def _process_pose_batch(batch_frames, model, conf):
+    """Process a batch of frames with YOLO pose inference."""
+    results = model(batch_frames, conf=conf, verbose=False)
+    return results
+
+
+def _process_pose_frame_result(frame_no, frame, result, video_obj, tfc, out, RIGHT_CHAIN):
+    """Process a single frame's pose detection result."""
+    if result is not None and result.keypoints is not None:
+        kpts_all = result.keypoints.xy.cpu().numpy()
+        if len(kpts_all) > 0:
+            person = kpts_all[0]  # first detected person
+
+            points = []
+            for _, idx in RIGHT_CHAIN:
+                x, y = person[idx]
+                if x > 0 and y > 0:
+                    points.append((int(x), int(y)))
+                else:
+                    points.append(None)
+
+            # draw points
+            for p in points:
+                if p is not None:
+                    cv2.circle(frame, p, 6, (0, 255, 0), -1)
+            
+            if None not in points:
+                shoulder, hip, knee, ankle = points
+                draw_angle(
+                    frame,
+                    shoulder,  # a
+                    hip,  # b (vertex)
+                    knee  # c
+                )
+                hipdelta, kneedalta = calculate_plank_angles(shoulder, hip, knee, ankle)
+
+                cv2.putText(
+                    frame,
+                    f"Corengagement : {core_engagement_level(hipdelta)}",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,  # font
+                    1.0,  # font scale
+                    (0, 255, 255),  # color (B, G, R)
+                    2,  # thickness
+                    cv2.LINE_AA
+                )
+
+            for p1, p2 in zip(points[:-1], points[1:]):
+                if p1 is not None and p2 is not None:
+                    cv2.line(frame, p1, p2, (255, 0, 0), 2)
+
+            if points[0] is not None and points[-1] is not None:
+                cv2.line(frame, points[0], points[-1], (0, 0, 255), 2)
+
+    out.write(frame)
+
+
 def draw_angle(frame, a, b, c, radius=40, color=(0, 255, 255), thickness=2):
 
     ba = np.array(a) - np.array(b)
@@ -102,65 +159,41 @@ def mark_right_side_pose(
         ("knee", 14),
         ("ankle", 16)
     ]
+    
+    # Batch processing variables
+    batch_size = 4
+    frame_batch = []
+    frame_numbers_batch = []
 
     while True:
         ret, frame = cap.read()
         if not ret:
+            # Process remaining frames in batch
+            if frame_batch:
+                batch_results = _process_pose_batch(frame_batch, model, conf)
+                for idx, fn in enumerate(frame_numbers_batch):
+                    if video_obj and int(fn / tfc * 100) % 10 == 0:
+                        video_obj.progress = int(fn / tfc * 100)
+                        video_obj.save(update_fields=["progress"])
+                    _process_pose_frame_result(fn, frame_batch[idx], batch_results[idx], video_obj, tfc, out, RIGHT_CHAIN)
             break
 
-        results = model(frame, conf=conf, verbose=False)
         frame_no += 1
-        if video_obj and int(frame_no / tfc * 100) % 10 == 0:
-            video_obj.progress = int(frame_no / tfc * 100)
-            video_obj.save(update_fields=["progress"])
+        frame_batch.append(frame)
+        frame_numbers_batch.append(frame_no)
+        
+        # Process when batch is full
+        if len(frame_batch) >= batch_size:
+            batch_results = _process_pose_batch(frame_batch, model, conf)
+            for idx, fn in enumerate(frame_numbers_batch):
+                if video_obj and int(fn / tfc * 100) % 10 == 0:
+                    video_obj.progress = int(fn / tfc * 100)
+                    video_obj.save(update_fields=["progress"])
+                _process_pose_frame_result(fn, frame_batch[idx], batch_results[idx], video_obj, tfc, out, RIGHT_CHAIN)
+            
+            frame_batch = []
+            frame_numbers_batch = []
 
-        if results and results[0].keypoints is not None:
-            kpts_all = results[0].keypoints.xy.cpu().numpy()
-            if len(kpts_all) > 0:
-                person = kpts_all[0]  # first detected person
-
-                points = []
-                for _, idx in RIGHT_CHAIN:
-                    x, y = person[idx]
-                    if x > 0 and y > 0:
-                        points.append((int(x), int(y)))
-                    else:
-                        points.append(None)
-
-                # draw points
-                for p in points:
-                    if p is not None:
-                        cv2.circle(frame, p, 6, (0, 255, 0), -1)
-                all_points_exist = all(p is not None for p in points)
-                if None not in points:
-                    shoulder, hip, knee, ankle = points
-                    draw_angle(
-                        frame,
-                        shoulder,  # a
-                        hip,  # b (vertex)
-                        knee  # c
-                    )
-                    hipdelta, kneedalta = calculate_plank_angles(shoulder , hip, knee, ankle)
-
-                    cv2.putText(
-                        frame,
-                        f"Corengagement : {core_engagement_level(hipdelta)}",
-                        (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX,  # font
-                        1.0,  # font scale
-                        (0, 255, 255),  # color (B, G, R)
-                        2,  # thickness
-                        cv2.LINE_AA
-                    )
-
-                for p1, p2 in zip(points[:-1], points[1:]):
-                    if p1 is not None and p2 is not None:
-                        cv2.line(frame, p1, p2, (255, 0, 0), 2)
-
-                if points[0] is not None and points[-1] is not None:
-                    cv2.line(frame, points[0], points[-1], (0, 0, 255), 2)
-
-        out.write(frame)
 
     cap.release()
     out.release()

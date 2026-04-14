@@ -170,20 +170,28 @@ def detect_carpet_segment_p(frame, p=0.75):
 def middle_finger_movement_distance(video_path, show=False, debug=True, video_obj=None, output_pth="temp_output_path.mp4", target_y=None):
     current_dir = Path(__file__).parent
     task_path = current_dir / "hand_landmarker.task"
-    base_options = python.BaseOptions(
-        model_asset_path=str(task_path),
-        delegate=python.BaseOptions.Delegate.CPU if CPU_ONLY else python.BaseOptions.Delegate.GPU
-    )
 
-    options = vision.HandLandmarkerOptions(
-        base_options=base_options,
-        num_hands=2,
-        min_hand_detection_confidence=0.1,
-        min_hand_presence_confidence=0.1,
-        min_tracking_confidence=0.1
-    )
+    def _make_detector(delegate):
+        base_options = python.BaseOptions(
+            model_asset_path=str(task_path),
+            delegate=delegate
+        )
+        options = vision.HandLandmarkerOptions(
+            base_options=base_options,
+            num_hands=2,
+            min_hand_detection_confidence=0.1,
+            min_hand_presence_confidence=0.1,
+            min_tracking_confidence=0.1
+        )
+        return vision.HandLandmarker.create_from_options(options)
 
-    detector = vision.HandLandmarker.create_from_options(options)
+    if CPU_ONLY:
+        detector = _make_detector(python.BaseOptions.Delegate.CPU)
+    else:
+        try:
+            detector = _make_detector(python.BaseOptions.Delegate.GPU)
+        except (NotImplementedError, Exception):
+            detector = _make_detector(python.BaseOptions.Delegate.CPU)
 
     cap = cv2.VideoCapture(video_path)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')

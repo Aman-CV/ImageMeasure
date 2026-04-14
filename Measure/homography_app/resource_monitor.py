@@ -200,15 +200,19 @@ class ResourceMonitorContext:
     """Context manager for automatic resource monitoring."""
     
     def __init__(self, task_name: str, video_id: int = None, tracking_interval: float = 2.0):
-        self.monitor = ResourceMonitor(task_name, video_id, tracking_interval)
+        from .config import RESOURCE_MONITOR
+        self._enabled = RESOURCE_MONITOR
+        self.monitor = ResourceMonitor(task_name, video_id, tracking_interval) if self._enabled else None
     
     def __enter__(self):
-        self.monitor.start()
+        if self._enabled:
+            self.monitor.start()
         return self.monitor
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.monitor.stop()
-        status = 'failed' if exc_type else 'completed'
-        self.monitor.log_metrics(status=status)
+        if self._enabled:
+            self.monitor.stop()
+            status = 'failed' if exc_type else 'completed'
+            self.monitor.log_metrics(status=status)
         if exc_type:
             logger.error(f"Task failed with exception: {exc_val}", exc_info=(exc_type, exc_val, exc_tb))

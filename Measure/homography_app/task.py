@@ -12,7 +12,7 @@ from .checkpoint_crossing import detect_crossing_rightmost_ankle, detect_crossin
 from .models import PetVideos, CalibrationDataModel
 from .helper import filter_and_smooth, detect_biggest_jump, \
     get_flat_start, \
-    ankle_crop_color_detection, correct_white_balance, highest_peak_by_adjacent_minima, test_video_url, \
+    ankle_crop_color_detection, ankle_crop_color_detection_from_result, correct_white_balance, highest_peak_by_adjacent_minima, test_video_url, \
     image_point_to_real_point
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
@@ -377,35 +377,41 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
             model.to(get_device())
             current_frame = 0
             last_logged_progress = 0
+
+            # Batch processing state
+            batch_size = 4
+            frame_batch = []
+
+            def _flush_batch(frame_batch):
+                if not frame_batch:
+                    return
+                batch_results = model.predict(frame_batch, conf=0.25, verbose=False)
+                for f, result in zip(frame_batch, batch_results):
+                    mask, ankle_points = ankle_crop_color_detection_from_result(f, result, CLAHE=clahe)
+                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    detected_points = [1280, 720] if len(ankle_points) < 2 else list(ankle_points[-1])
+                    offset = 5  # pixel
+                    detected_points[-1] = offset + detected_points[-1]
+                    for cnt in contours:
+                        if cnt is None or len(cnt) == 0:
+                            continue
+                        M = cv2.moments(cnt)
+                        if M["m00"] != 0:
+                            cx = int(M["m10"] / M["m00"])
+                            cy = int(M["m01"] / M["m00"])
+                            if detected_points[1] < cy or cy < 720 // 2:
+                                if enable_color_marker_tracking:
+                                    detected_points = [cx, cy]
+                    trajectory.append(detected_points)
+
             while True:
                 ret, frame = cap.read()
                 if not ret:
+                    _flush_batch(frame_batch)
                     break
                 frame = correct_white_balance(frame)
                 frame = cv2.resize(frame, (1280, 720))
-                mask, ankle_points = ankle_crop_color_detection(frame, CLAHE=clahe, model=model)
-
-                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-                detected_points = [1280, 720] if len(ankle_points) < 2 else list(ankle_points[-1])
-                offset = 5 #pixel
-                detected_points[-1] = offset + detected_points[-1]
-                for cnt in contours:
-                    if cnt is None or len(cnt) == 0:
-                        continue
-
-                    M = cv2.moments(cnt)
-                    if M["m00"] != 0:
-                        cx = int(M["m10"] / M["m00"])
-                        cy = int(M["m01"] / M["m00"])
-
-                        if detected_points[1] < cy or cy < 720 // 2:
-                            if enable_color_marker_tracking:
-                                detected_points = [cx, cy]
-
-                # cv2.drawContours(frame, [largest_contour], -1, (0, 255, 0), 2)
-
-                trajectory.append(detected_points)
+                frame_batch.append(frame)
                 current_frame += 1
                 if total_frames > 0:
                     progress = int((current_frame / total_frames) * 100)
@@ -413,6 +419,9 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
                         video_obj.progress = progress
                         video_obj.save(update_fields=["progress"])
                         last_logged_progress = progress
+                if len(frame_batch) >= batch_size:
+                    _flush_batch(frame_batch)
+                    frame_batch = []
 
             cap.release()
 

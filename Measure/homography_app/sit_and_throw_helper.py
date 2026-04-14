@@ -9,6 +9,61 @@ from .config import get_device
 logger = logging.getLogger('homography_app')
 
 
+def _process_frame_result(frame_no, frame0, frame, contours, result, positions, start_cutoff, out):
+    """Process a single frame's prediction result from batch inference."""
+    curr_pos = [frame_no, 0, 0]
+    detected = False
+    
+    if result.boxes is not None and len(result.boxes) > 0:
+        xyxy = result.boxes.xyxy.cpu().numpy().astype(int)
+        x1, y1, x2, y2 = xyxy[0]  # take first detected ball
+        cx = int((x1 + x2) / 2)
+        cy = int((y1 + y2) / 2)
+        cv2.rectangle(frame0, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.circle(frame0, (cx, cy), 6, (255, 0, 255), -1)
+        curr_pos = [frame_no, cx, cy]
+        detected = True
+
+    if not detected and len(contours) > 0:
+        best = max(contours, key=lambda c: cv2.contourArea(c))
+        if cv2.contourArea(best) > 80:
+            x, y, w_box, h_box = cv2.boundingRect(best)
+            cx = x + w_box // 2
+            cy = y + h_box // 2
+            cv2.rectangle(frame0, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
+            cv2.circle(frame0, (cx, cy), 6, (0, 255, 255), -1)
+            cv2.putText(frame0, f"...", (x, y-3),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
+            curr_pos = [frame_no, cx, cy]
+
+    positions.append(curr_pos)
+    x = int(start_cutoff * frame.shape[1])
+    cv2.line(frame, (x, 0), (x, frame.shape[0]), (0, 255, 0), 1)
+    out.write(frame0)
+
+
+def _process_frame_no_ai(frame_no, frame0, frame, contours, positions, start_cutoff, out):
+    """Process frame without AI (fallback to contour detection)."""
+    curr_pos = [frame_no, 0, 0]
+    
+    if len(contours) > 0:
+        best = max(contours, key=lambda c: cv2.contourArea(c))
+        if cv2.contourArea(best) > 80:
+            x, y, w_box, h_box = cv2.boundingRect(best)
+            cx = x + w_box // 2
+            cy = y + h_box // 2
+            cv2.rectangle(frame0, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
+            cv2.circle(frame0, (cx, cy), 6, (0, 255, 255), -1)
+            cv2.putText(frame0, f"...", (x, y-3),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
+            curr_pos = [frame_no, cx, cy]
+
+    positions.append(curr_pos)
+    x = int(start_cutoff * frame.shape[1])
+    cv2.line(frame, (x, 0), (x, frame.shape[0]), (0, 255, 0), 1)
+    out.write(frame0)
+
+
 
 def analyze_positions(positions):
 
@@ -111,9 +166,20 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None, output_pth
     model = YOLO("yolov8x.pt")  # pre-trained on COCO dataset
     model.to(get_device())
     use_ai = True
+    
+    # Batch processing variables
+    batch_size = 4
+    frame_batch = []
+    frame_batch_info = []  # Store (frame_no, frame0, frame, contours) for processing
+    
     while True:
         ret, frame0 = cap.read()
         if not ret:
+            # Process remaining frames in batch
+            if frame_batch and use_ai:
+                batch_results = model.predict(frame_batch, classes=[32], conf=0.2, verbose=False)
+                for idx, (fn, f0, f, contours) in enumerate(frame_batch_info):
+                    _process_frame_result(fn, f0, f, contours, batch_results[idx], positions, start_cutoff, out)
             break
 
         frame_no += 1
@@ -130,57 +196,24 @@ def get_first_bounce_frame_MOG(inp, start_cutoff=0.25,video_obj=None, output_pth
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
 
-
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        curr_pos = [frame_no, 0, 0]
-        if use_ai:
-            results = model.predict(frame, classes=[32], conf=0.2, verbose=False)  # sports ball only
-            detected = False
-            for r in results:
-                if r.boxes is not None and len(r.boxes) > 0:
-                    xyxy = r.boxes.xyxy.cpu().numpy().astype(int)
-                    x1, y1, x2, y2 = xyxy[0]  # take first detected ball
-                    cx = int((x1 + x2) / 2)
-                    cy = int((y1 + y2) / 2)
-                    cv2.rectangle(frame0, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.circle(frame0, (cx, cy), 6, (255, 0, 255), -1)
-                    # cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
-                    #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
-                    curr_pos = [frame_no, cx, cy]
-                    detected = True
-                    break
-
-            if not detected:
-                curr_pos = [frame_no, 0, 0]
-
-        if not use_ai or (len(contours) > 0 and (curr_pos[1]==0 and curr_pos[2] == 0)):
-
-            best = max(contours, key=lambda c: cv2.contourArea(c))
-
-            if cv2.contourArea(best) > 80:
-                x, y, w_box, h_box = cv2.boundingRect(best)
-
-                cx = x + w_box // 2
-                cy = y + h_box // 2
-
-                cv2.rectangle(frame0, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
-                cv2.circle(frame0, (cx, cy), 6, (0, 255, 255), -1)
-                cv2.putText(frame0, f"...", (x, y-3),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
-                # cv2.putText(frame0, f"Frame {frame_no}", (10, 30),
-                #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
-                curr_pos = [frame_no, cx, cy]
-        positions.append(curr_pos)
-        x = int(start_cutoff * frame.shape[1])
-
-        cv2.line(
-            frame,
-            (x, 0),
-            (x, frame.shape[0]),
-            (0, 255, 0),  # green color (BGR)
-            1  # thickness
-        )
-        out.write(frame0)
+        
+        # Accumulate frame for batch processing
+        frame_batch.append(frame)
+        frame_batch_info.append((frame_no, frame0, frame, contours))
+        
+        # Process batch when full
+        if len(frame_batch) >= batch_size:
+            if use_ai:
+                batch_results = model.predict(frame_batch, classes=[32], conf=0.2, verbose=False)
+                for idx, (fn, f0, f, contours) in enumerate(frame_batch_info):
+                    _process_frame_result(fn, f0, f, contours, batch_results[idx], positions, start_cutoff, out)
+            else:
+                for fn, f0, f, contours in frame_batch_info:
+                    _process_frame_no_ai(fn, f0, f, contours, positions, start_cutoff, out)
+            
+            frame_batch = []
+            frame_batch_info = []
 
 
     cap.release()
