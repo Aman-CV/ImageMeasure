@@ -1,0 +1,7 @@
+video_id,task,test_id,assessment_id,thread,started_at,finished_at,duration_s,result_distance_m,result_duration_s,status,error_msg
+67,broad_jump,G6bWk0bW,2ybjG2ND,ThreadPoolExecutor-1_2,"2026-04-15 14:13:04,556000","2026-04-15 14:13:27,770000",23.214,1.5,,done,
+77,plank,vmK617LE,2ybjG2ND,ThreadPoolExecutor-1_0,"2026-04-15 15:53:45,579000","2026-04-15 15:53:54,716000",9.137,,,done,
+75,sit_and_throw,BwbJyXKl,2ybjG2ND,ThreadPoolExecutor-1_0,"2026-04-15 15:54:03,624000","2026-04-15 15:54:17,201000",13.577,3.566,,done,
+71,sit_and_reach,vPbXoPK4,2ybjG2ND,ThreadPoolExecutor-1_1,"2026-04-15 15:54:05,546000","2026-04-15 15:54:32,499000",26.953,7.883,,done,
+68,broad_jump,G6bWk0bW,2ybjG2ND,ThreadPoolExecutor-1_2,"2026-04-15 15:54:07,114000","2026-04-15 15:54:31,042000",23.928,1.867,,done,
+61,6x15_dash,Vnb7E6L6,2ybjG2ND,ThreadPoolExecutor-1_3,"2026-04-15 15:54:10,496000","2026-04-15 15:54:37,550000",27.054,,19.066,done,

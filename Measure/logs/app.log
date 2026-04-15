@@ -1,0 +1,31 @@
+INFO 2026-04-15 14:12:22,240 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw started: video=75 test=BwbJyXKl assessment=2ybjG2ND
+INFO 2026-04-15 14:12:42,546 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw done: video=75 distance=3.566m
+INFO 2026-04-15 14:12:58,644 [ThreadPoolExecutor-1_0] task process_plank plank started: video=77 test=vmK617LE assessment=2ybjG2ND
+INFO 2026-04-15 14:13:02,391 [ThreadPoolExecutor-1_1] task process_sit_and_reach sit_and_reach started: video=71 test=vPbXoPK4 assessment=2ybjG2ND
+INFO 2026-04-15 14:13:04,556 [ThreadPoolExecutor-1_2] task process_video_task broad_jump started: video=67 test=G6bWk0bW assessment=2ybjG2ND color_marker=True jump_detect=True
+INFO 2026-04-15 14:13:04,958 [ThreadPoolExecutor-1_0] task process_plank plank done: video=77
+INFO 2026-04-15 14:13:08,065 [ThreadPoolExecutor-1_0] task process_ttest_6x15_dash 6x15_dash started: video=61 test=Vnb7E6L6 assessment=2ybjG2ND
+INFO 2026-04-15 14:13:16,604 [ThreadPoolExecutor-1_1] task process_sit_and_reach sit_and_reach done: video=71 distance=7.883m
+INFO 2026-04-15 14:13:19,028 [ThreadPoolExecutor-1_0] task process_ttest_6x15_dash 6x15_dash: running crossing detector for video 61
+WARNING 2026-04-15 14:13:22,237 [ThreadPoolExecutor-1_2] task process_video_task broad_jump: flat start not detected for video 67, using full trajectory
+INFO 2026-04-15 14:13:27,770 [ThreadPoolExecutor-1_2] task process_video_task broad_jump done: video=67 distance=1.5m
+INFO 2026-04-15 14:13:30,462 [ThreadPoolExecutor-1_0] task process_ttest_6x15_dash 6x15_dash done: video=61 duration=19.066s
+INFO 2026-04-15 15:43:18,268 [ThreadPoolExecutor-1_0] task process_plank plank started: video=77 test=vmK617LE assessment=2ybjG2ND
+INFO 2026-04-15 15:43:27,951 [ThreadPoolExecutor-1_0] task process_plank plank done: video=77
+INFO 2026-04-15 15:53:45,579 [ThreadPoolExecutor-1_0] task process_plank plank started: video=77 test=vmK617LE assessment=2ybjG2ND
+INFO 2026-04-15 15:53:54,716 [ThreadPoolExecutor-1_0] task process_plank plank done: video=77
+INFO 2026-04-15 15:54:03,624 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw started: video=75 test=BwbJyXKl assessment=2ybjG2ND
+INFO 2026-04-15 15:54:05,546 [ThreadPoolExecutor-1_1] task process_sit_and_reach sit_and_reach started: video=71 test=vPbXoPK4 assessment=2ybjG2ND
+INFO 2026-04-15 15:54:07,114 [ThreadPoolExecutor-1_2] task process_video_task broad_jump started: video=68 test=G6bWk0bW assessment=2ybjG2ND color_marker=True jump_detect=True
+INFO 2026-04-15 15:54:10,496 [ThreadPoolExecutor-1_3] task process_ttest_6x15_dash 6x15_dash started: video=61 test=Vnb7E6L6 assessment=2ybjG2ND
+INFO 2026-04-15 15:54:17,201 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw done: video=75 distance=3.566m
+INFO 2026-04-15 15:54:26,723 [ThreadPoolExecutor-1_3] task process_ttest_6x15_dash 6x15_dash: running crossing detector for video 61
+INFO 2026-04-15 15:54:31,042 [ThreadPoolExecutor-1_2] task process_video_task broad_jump done: video=68 distance=1.867m
+INFO 2026-04-15 15:54:32,499 [ThreadPoolExecutor-1_1] task process_sit_and_reach sit_and_reach done: video=71 distance=7.883m
+INFO 2026-04-15 15:54:37,550 [ThreadPoolExecutor-1_3] task process_ttest_6x15_dash 6x15_dash done: video=61 duration=19.066s
+INFO 2026-04-15 16:04:10,849 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw started: video=74 test=BwbJyXKl assessment=2ybjG2ND
+INFO 2026-04-15 16:04:28,578 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw done: video=74 distance=3.131m
+INFO 2026-04-15 16:04:29,663 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw started: video=75 test=BwbJyXKl assessment=2ybjG2ND
+INFO 2026-04-15 16:04:44,394 [ThreadPoolExecutor-1_0] task process_sit_and_throw sit_and_throw done: video=75 distance=3.566m
+INFO 2026-04-15 16:04:45,442 [ThreadPoolExecutor-1_0] task process_sit_and_reach sit_and_reach started: video=72 test=vPbXoPK4 assessment=2ybjG2ND
+INFO 2026-04-15 16:04:57,106 [ThreadPoolExecutor-1_0] task process_sit_and_reach sit_and_reach done: video=72 distance=-1.994m
