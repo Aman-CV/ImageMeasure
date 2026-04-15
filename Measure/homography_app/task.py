@@ -1,7 +1,7 @@
 import os
 import logging
 import subprocess
-from background_task import background
+import psutil
 from django.conf import settings
 from django.core.files import File
 import cv2
@@ -22,6 +22,13 @@ from .sit_and_reach_helper_ import middle_finger_movement_distance
 from .sit_and_throw_helper import get_first_bounce_frame_MOG
 
 logger = logging.getLogger('homography_app')
+
+_MIN_FREE_MEMORY_BYTES = 3 * 1024 ** 3  # 3 GB
+
+
+def check_memory_available(min_gb: float = 3.0) -> bool:
+    """Return True if at least *min_gb* GB of RAM is currently available."""
+    return psutil.virtual_memory().available >= min_gb * 1024 ** 3
 
 def _legacy_video_path(video_obj):
     ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
@@ -93,7 +100,9 @@ def _encode_to_h264(input_path, output_path, resolution=None, fps=None):
     try:
         subprocess.run(cmd, check=True,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL)
+        stderr=subprocess.DEVNULL,
+        timeout=300, 
+        )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"FFmpeg encoding failed: {e}")
 
@@ -117,12 +126,25 @@ def _ensure_local_video(video_obj):
     raise FileNotFoundError(f"Local video was not created for id={video_obj.id}")
 
 
+from django.core.files import File
+import os
+
 def _save_processed_file(video_obj, output_path, original_name):
-    if video_obj.processed_file:
-        video_obj.processed_file.delete(save=False)
-        video_obj.processed_file = None
-    with open(output_path, 'rb') as f:
-        video_obj.processed_file.save(original_name, File(f), save=False)
+    old_file_name = video_obj.processed_file.name if video_obj.processed_file else None
+
+    try:
+        with open(output_path, 'rb') as f:
+            video_obj.processed_file.save(original_name, File(f), save=True)
+        
+        if old_file_name:
+            try:
+                video_obj.processed_file.storage.delete(old_file_name)
+            except Exception as e:
+                print(f"Cleanup of old file {old_file_name} failed: {e}")
+
+    except Exception as e:
+        print(f"Critical error during S3 upload: {e}")
+        raise 
 
 
 def download_and_save_video(obj):
@@ -165,7 +187,8 @@ def download_and_save_video(obj):
         ],
         check=True,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.DEVNULL,
+        timeout=300, 
     )
     _remove_files(raw_path)
     print("Deleted raw upload:", raw_path)
@@ -173,7 +196,10 @@ def download_and_save_video(obj):
 
 
 
-@background(schedule=0, remove_existing_tasks=True)
+def _process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
+    return process_sit_and_throw(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+
+
 def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     if test_id == "" or assessment_id == "":
         logger.error(f"sit_and_throw: missing test_id or assessment_id (video={petvideo_id})")
@@ -255,7 +281,10 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         logger.error(f"sit_and_throw failed: video={petvideo_id} — {e}", exc_info=True)
 
 
-@background(schedule=0, remove_existing_tasks=True)
+def _process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
+    return process_sit_and_reach(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+
+
 def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
     if len(test_id) == 0 or len(assessment_id) == 0:
         logger.error(f"sit_and_reach: missing test_id or assessment_id (video={petvideo_id})")
@@ -330,13 +359,16 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             _cleanup_local_video(video_obj)
             test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
             logger.info(f"sit_and_reach done: video={petvideo_id} distance={round(distance, 3) if distance else 'N/A'}m")
-
         except Exception as e:
             logger.error(f"sit_and_reach failed: video={petvideo_id} — {e}", exc_info=True)
         return
 
 
-@background(schedule=0, remove_existing_tasks=True)
+def _process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id=""):
+    return process_video_task(petvideo_id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id)
+
+
+
 def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id=""):
     if test_id == "" or assessment_id == "":
         logger.error(f"broad_jump: missing test_id or assessment_id (video={petvideo_id})")
@@ -575,7 +607,10 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         logger.error(f"broad_jump failed: video={petvideo_id} — {e}", exc_info=True)
 
 
-@background(schedule=0, remove_existing_tasks=True)
+def _process_15m_dash(petvideo_id, test_id, assessment_id):
+    return process_15m_dash(petvideo_id, test_id, assessment_id)
+
+
 def process_15m_dash(petvideo_id, test_id, assessment_id):
     process_ttest_6x15_dash(petvideo_id, test_id, assessment_id)
     return
@@ -652,7 +687,10 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
         logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
 
 
-@background(schedule=0, remove_existing_tasks=True)
+def _process_plank(petvideo_id, test_id, assessment_id):
+    return process_plank(petvideo_id, test_id, assessment_id)
+
+
 def process_plank(petvideo_id, test_id, assessment_id):
     if test_id == "" or assessment_id == "":
         logger.error(f"plank: missing test_id or assessment_id (video={petvideo_id})")

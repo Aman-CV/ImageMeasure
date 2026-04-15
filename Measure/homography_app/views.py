@@ -16,7 +16,13 @@ from .helper import merge_close_points, DEFAULT_HSV, TOL_S, TOL_H, TOL_V, order_
     process_frame_for_color_centers, correct_white_balance, stretch_contrast, find_yellow_point_lab
 from .models import PetVideos, SingletonHomographicMatrixModel, CalibrationDataModel
 from .sit_and_reach_helper_ import detect_carpet_segment_p
-from .task import process_video_task, process_sit_and_throw, process_sit_and_reach, process_15m_dash, process_plank
+from .celery_tasks import (
+    celery_process_sit_and_throw,
+    celery_process_sit_and_reach,
+    celery_process_video_task,
+    celery_process_15m_dash,
+    celery_process_plank,
+)
 from django.conf import settings
 import base64
 
@@ -79,7 +85,7 @@ def _create_1fps_video_file(uploaded_video):
         '-an',
         temp_output_path,
     ]
-    subprocess.run(command, check=True)
+    subprocess.run(command, check=True, timeout=300, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return temp_input_path, temp_output_path
 
 
@@ -106,7 +112,7 @@ def _cache_video_for_worker(video_obj):
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
             '-c:a', 'aac', '-movflags', '+faststart', '-y',
             final_path
-        ], check=True)
+        ], check=True, timeout=300, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
         print('FFmpeg failed. Keeping raw file for debugging.')
         raise e
@@ -118,15 +124,15 @@ def _cache_video_for_worker(video_obj):
 
 def _dispatch_processing_task(video_id, test_id, assessment_id, enable_color_marker_tracking, enable_start_end_detector):
     if test_id == 'BwbJyXKl':
-        process_sit_and_throw(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_sit_and_throw.delay(video_id, test_id=test_id, assessment_id=assessment_id)
     elif test_id == 'vPbXoPK4':
-        process_sit_and_reach(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_sit_and_reach.delay(video_id, test_id=test_id, assessment_id=assessment_id)
     elif test_id in ('lzb1PEKm', 'Vnb7E6L6', 'VpKl80KM'):
-        process_15m_dash(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_15m_dash.delay(video_id, test_id=test_id, assessment_id=assessment_id)
     elif test_id == 'vmK617LE':
-        process_plank(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_plank.delay(video_id, test_id=test_id, assessment_id=assessment_id)
     else:
-        process_video_task(
+        celery_process_video_task.delay(
             video_id,
             enable_color_marker_tracking=enable_color_marker_tracking,
             enable_start_end_detector=enable_start_end_detector,

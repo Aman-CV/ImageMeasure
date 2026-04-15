@@ -67,34 +67,34 @@ class PetVideos(models.Model):
         self.is_video_processed = False if self.to_be_processed else True
         self.progress = 0
         self.save()
-        from .task import (
-            process_sit_and_reach,
-            process_sit_and_throw,
-            process_video_task,
-            process_15m_dash,
-        process_plank
+        from .celery_tasks import (
+            celery_process_sit_and_reach,
+            celery_process_sit_and_throw,
+            celery_process_video_task,
+            celery_process_15m_dash,
+            celery_process_plank,
         )
 
         if self.test_id in ("vPbXoPK4", "reach"):
-            return process_sit_and_reach(
+            return celery_process_sit_and_reach.delay(
                 self.id,
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
             )
 
         elif self.test_id in ("BwbJyXKl", "throw"):
-            return process_sit_and_throw(
+            return celery_process_sit_and_throw.delay(
                 self.id,
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
             )
-        elif self.test_id in ("lzb1PEKm", "Vnb7E6L6", "VpKl80KM" ,"15run"):
-            return process_15m_dash(self.id, test_id=self.test_id,assessment_id=self.assessment_id)
+        elif self.test_id in ("lzb1PEKm", "Vnb7E6L6", "VpKl80KM", "15run"):
+            return celery_process_15m_dash.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
 
         elif self.test_id in ("vmK617LE", "plank"):
-            return process_plank(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
+            return celery_process_plank.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
 
-        return process_video_task(
+        return celery_process_video_task.delay(
             self.id,
             test_id=self.test_id,
             assessment_id=self.assessment_id,

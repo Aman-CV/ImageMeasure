@@ -50,7 +50,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'homography_app',
     'background_task',
-    'storages'
+    'storages',
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
@@ -182,7 +183,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {funcName} {message}',
+            'format': '{levelname} {asctime} [{threadName}] {module} {funcName} {message}',
             'style': '{',
         },
     },
@@ -194,12 +195,27 @@ LOGGING = {
             'backupCount': 3,
             'formatter': 'verbose',
         },
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'homography_app': {
-            'handlers': ['app_file'],
+            'handlers': ['app_file', 'console'],
             'level': 'INFO',
-            'propagate': False,  # don't bubble up to root/server logger
+            'propagate': False,
         },
     },
 }
+
+# ---------------------------------------------------------------------------
+# Celery
+# ---------------------------------------------------------------------------
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
