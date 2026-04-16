@@ -26,7 +26,7 @@ logger = logging.getLogger('homography_app')
 
 _RETRY_COUNTDOWN = 60   # seconds to wait before re-checking memory
 _MAX_RETRIES = 120      # 120 × 60 s = ~2 hours ceiling
-_CONCURRENT_THRESHOLD = 4  # only enforce memory check when this many tasks are already running
+_CONCURRENT_THRESHOLD = 3  # only enforce memory check when this many tasks are already running
 
 
 def _active_task_count():
@@ -40,11 +40,11 @@ def _active_task_count():
 
 
 def _check_or_retry(task):
-    """If >= 4 concurrent tasks are running AND < 3 GB free, reschedule."""
-    if _active_task_count() >= _CONCURRENT_THRESHOLD and not check_memory_available(min_gb=3.0):
+    """If >= 3 concurrent tasks are running AND < 2 GB free, reschedule."""
+    if _active_task_count() >= _CONCURRENT_THRESHOLD and not check_memory_available(min_gb=2.0):
         avail_gb = psutil.virtual_memory().available / 1024 ** 3
         logger.warning(
-            'Task %s: only %.1f GB free with >=4 active tasks, rescheduling in %ds (attempt %d/%d)',
+            'Task %s: only %.1f GB free with >=3 active tasks, rescheduling in %ds (attempt %d/%d)',
             task.name, avail_gb, _RETRY_COUNTDOWN,
             task.request.retries + 1, _MAX_RETRIES,
         )

@@ -23,10 +23,10 @@ from .sit_and_throw_helper import get_first_bounce_frame_MOG
 
 logger = logging.getLogger('homography_app')
 
-_MIN_FREE_MEMORY_BYTES = 3 * 1024 ** 3  # 3 GB
+_MIN_FREE_MEMORY_BYTES = 2 * 1024 ** 3  # 2 GB
 
 
-def check_memory_available(min_gb: float = 3.0) -> bool:
+def check_memory_available(min_gb: float = 2.0) -> bool:
     """Return True if at least *min_gb* GB of RAM is currently available."""
     return psutil.virtual_memory().available >= min_gb * 1024 ** 3
 
@@ -101,7 +101,7 @@ def _encode_to_h264(input_path, output_path, resolution=None, fps=None):
         subprocess.run(cmd, check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        timeout=300, 
+        timeout=120, 
         )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"FFmpeg encoding failed: {e}")
@@ -188,7 +188,7 @@ def download_and_save_video(obj):
         check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        timeout=300, 
+        timeout=120, 
     )
     _remove_files(raw_path)
     print("Deleted raw upload:", raw_path)
