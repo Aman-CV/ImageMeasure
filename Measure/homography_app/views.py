@@ -51,7 +51,7 @@ def _as_bool(value, default=False):
     return str(value).lower() in ('true', '1', 'yes', 'on')
 
 
-def _video_defaults(video, participant_name, pet_type, duration_ms, to_be_processed, take_best=False):
+def _video_defaults(video, participant_name, pet_type, duration_ms, to_be_processed, type_param, take_best=False):
     return {
         'name': video.name,
         'file': video,
@@ -62,6 +62,7 @@ def _video_defaults(video, participant_name, pet_type, duration_ms, to_be_proces
         'to_be_processed': to_be_processed,
         'is_video_processed': False if to_be_processed else True,
         'take_best': take_best,
+        'type_param': type_param
     }
 
 
