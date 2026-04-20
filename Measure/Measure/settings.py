@@ -202,7 +202,7 @@ LOGGING = {
     },
     'loggers': {
         'homography_app': {
-            'handlers': ['app_file', 'console'],
+            'handlers': ['app_file'],
             'level': 'INFO',
             'propagate': False,
         },
