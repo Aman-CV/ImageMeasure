@@ -420,7 +420,7 @@ def write_video_until_frame(
             speed_mps = reference / duration
             cv2.putText(
             frame,
-            f"Speed: {100 / speed_mps:.2f} s/100m @ {round(duration,3)}s",
+            f"Time @ {round(duration,3)}s",
             (30, 60),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.0,

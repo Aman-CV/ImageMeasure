@@ -167,7 +167,7 @@ def upload_video(request):
         type_param = type_param.lower()
     os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
 
-    if test_id == 'core strength':
+    if type_param == 'core strength':
         temp_input_path = None
         temp_output_path = None
         try:
