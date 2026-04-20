@@ -36,6 +36,7 @@ class PetVideos(models.Model):
     to_be_processed = models.BooleanField(default=False)
     assessment_id = models.CharField(max_length=64, default="dummy")
     test_id = models.CharField(max_length=64, default="jump")
+    type_param = models.CharField(max_length=64, default="core strength", blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -75,23 +76,23 @@ class PetVideos(models.Model):
             celery_process_plank,
         )
 
-        if self.test_id in ("vPbXoPK4", "reach"):
+        if self.type_param in ("flexibility", "reach"):
             return celery_process_sit_and_reach.delay(
                 self.id,
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
             )
 
-        elif self.test_id in ("BwbJyXKl", "throw"):
+        elif self.type_param in ("upper body strength", "throw"):
             return celery_process_sit_and_throw.delay(
                 self.id,
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
             )
-        elif self.test_id in ("lzb1PEKm", "Vnb7E6L6", "VpKl80KM", "15run"):
+        elif self.type_param in ("endurance", "sprint speed", "agility"):
             return celery_process_15m_dash.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
 
-        elif self.test_id in ("vmK617LE", "plank"):
+        elif self.type_param in ("core strength",):
             return celery_process_plank.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
 
         return celery_process_video_task.delay(

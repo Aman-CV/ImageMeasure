@@ -34,10 +34,10 @@ DEFAULT_HOMOGRAPH_POINTS = {
             }
 
 FALL_BACK = {
-    'vPbXoPK4' : 20,
-    'BwbJyXKl' : 1.4224,
+    'flexibility' : 20,
+    'lower body strength' : 1.4224,
     'default' : 1,
-    'G6bWk0bW' : 1.4224
+    'upper body strength' : 1.4224
 }
 
 
@@ -122,14 +122,14 @@ def _cache_video_for_worker(video_obj):
         print('Deleted raw upload:', raw_path)
 
 
-def _dispatch_processing_task(video_id, test_id, assessment_id, enable_color_marker_tracking, enable_start_end_detector):
-    if test_id == 'BwbJyXKl':
+def _dispatch_processing_task(test_type, video_id, test_id, assessment_id, enable_color_marker_tracking, enable_start_end_detector):
+    if test_type == 'upper body strength' or test_type == 'throw':
         celery_process_sit_and_throw.delay(video_id, test_id=test_id, assessment_id=assessment_id)
-    elif test_id == 'vPbXoPK4':
+    elif test_type == 'flexibility' or test_type == 'reach':
         celery_process_sit_and_reach.delay(video_id, test_id=test_id, assessment_id=assessment_id)
-    elif test_id in ('lzb1PEKm', 'Vnb7E6L6', 'VpKl80KM'):
+    elif test_type in ('endurance', 'sprint speed', 'agility'):
         celery_process_15m_dash.delay(video_id, test_id=test_id, assessment_id=assessment_id)
-    elif test_id == 'vmK617LE':
+    elif test_type == 'core strength':
         celery_process_plank.delay(video_id, test_id=test_id, assessment_id=assessment_id)
     else:
         celery_process_video_task.delay(
@@ -162,10 +162,12 @@ def upload_video(request):
     enable_start_end_detector = _as_bool(request.POST.get('enable_start_end_detector', 'true'), default=True)
     enable_color_marker_tracking = _as_bool(request.POST.get('enable_color_marker_tracking', 'true'), default=True)
     take_best = _as_bool(request.POST.get('take_best', 'false'), default=False)
-
+    type_param = request.POST.get('type_param', "core strength")
+    if type_param is not None:
+        type_param = type_param.lower()
     os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
 
-    if test_id == 'vmK617LE':
+    if test_id == 'core strength':
         temp_input_path = None
         temp_output_path = None
         try:
@@ -182,6 +184,7 @@ def upload_video(request):
                         duration_ms,
                         to_be_processed,
                         take_best=take_best,
+                        type_param=type_param
                     )
                 )
         finally:
@@ -201,11 +204,13 @@ def upload_video(request):
                 duration_ms,
                 to_be_processed,
                 take_best=take_best,
+                type_param = type_param
             )
         )
         _cache_video_for_worker(obj)
 
     _dispatch_processing_task(
+        obj.type_param,
         obj.id,
         test_id,
         assessment_id,
@@ -255,8 +260,8 @@ def _extract_middle_frame(video_file, test_id):
         middle_frame_index = total_frames // 2
         cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
         ret, frame = cap.read()
-        if test_id == 'vPbXoPK4' and frame is not None:
-            frame = correct_white_balance(frame)
+        # if test_id == 'vPbXoPK4' and frame is not None:
+        #     frame = correct_white_balance(frame)
 
         if not ret or frame is None:
             raise ValueError('Could not extract frame from video')
@@ -387,7 +392,7 @@ def _run_homography_calibration(frame, payload):
             points = pt2
             end_point_of_mat = 'Markers not detected using end points of mat'
             points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
-            unit_distance = FALL_BACK.get(payload['test_id'], 1)
+            unit_distance = FALL_BACK.get(payload['type_param'], 1)
         else:
             return JsonResponse({
                 'status': 'error',
@@ -465,14 +470,21 @@ def upload_calibration_video(request):
     if request.method != 'POST' or not request.FILES.get('video'):
         return JsonResponse({'status': 'error', 'message': 'No image uploaded'}, status=400)
 
-    payload = dict(video_file=request.FILES['video'], test_id=request.POST.get('test_id', 'not_sit_and_reach'),
-                   unit_distance=float(request.POST.get('square_size', 2.5908)),
-                   position_factor=float(request.POST.get('position_factor', 0.5)),
-                   position_factor2=float(request.POST.get('position_factor2', 0.15)),
-                   assessment_id=request.POST.get('assessment_id', 'notvalid'),
-                   use_homograph=_as_bool(request.POST.get('use_homograph', 'false'), default=False),
-                   use_sam_homograph=_as_bool(request.POST.get('use_sam_homograph', 'false'), default=False),
-                   origin_x=float(request.POST.get('origin_x', 0)), origin_y=float(request.POST.get('origin_y', 0)))
+    payload = dict(
+        video_file=request.FILES['video'],
+        test_id=request.POST.get('test_id', 'not_sit_and_reach'),
+        unit_distance=float(request.POST.get('square_size', 2.5908)),
+        position_factor=float(request.POST.get('position_factor', 0.5)),
+        position_factor2=float(request.POST.get('position_factor2', 0.15)),
+        assessment_id=request.POST.get('assessment_id', 'notvalid'),
+        use_homograph=_as_bool(request.POST.get('use_homograph', 'false'), default=False),
+        use_sam_homograph=_as_bool(request.POST.get('use_sam_homograph', 'false'), default=False),
+        origin_x=float(request.POST.get('origin_x', 0)),
+        origin_y=float(request.POST.get('origin_y', 0)),
+        type_param=request.POST.get('type_param', None)
+    )
+    if payload['type_param'] is not None:
+        payload['type_param'] = payload['type_param'].lower()
     payload['homograph_points'] = _parse_homograph_points(request.POST.get('hpoints', None))
 
     try:
@@ -480,8 +492,9 @@ def upload_calibration_video(request):
     except ValueError as exc:
         return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
 
-    simple_test_ids = {'Vnb7E6L6', 'VpKl80KM', 'BwbJyXKl', 'G6bWk0bW', 'vPbXoPK4', 'lzb1PEKm'}
-    if not payload['use_sam_homograph'] and payload['test_id'] in simple_test_ids:
+    #simple_test_ids = {'Vnb7E6L6', 'VpKl80KM', 'BwbJyXKl', 'G6bWk0bW', 'vPbXoPK4', 'lzb1PEKm'}
+    simple_test_type = {"upper body strength", "lower body strength", "sprint speed", "agility", "flexibility", "endurance"}
+    if not payload['use_sam_homograph'] and payload['type_param'] in simple_test_type:
         return _run_simple_calibration(frame, payload)
 
     return _run_homography_calibration(frame, payload)
