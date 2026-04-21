@@ -148,7 +148,7 @@ class SingletonHomographicMatrixModel(models.Model):
     class Meta:
         constraints = [
             CheckConstraint(
-                check=Q(id=1),
+                condition=Q(id=1),
                 name='only_one_instance'
             )
         ]
