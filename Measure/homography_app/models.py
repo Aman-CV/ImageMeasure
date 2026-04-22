@@ -154,7 +154,7 @@ class SingletonHomographicMatrixModel(models.Model):
                 )
             ]
         except Exception as e:
-            checks = [
+            constraints = [
                 CheckConstraint(
                     check=Q(id=1),
                     name='only_one_instance'
