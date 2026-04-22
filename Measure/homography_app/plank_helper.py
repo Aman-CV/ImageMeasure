@@ -78,23 +78,25 @@ def mark_right_side_pose(
     video_obj=None
 ):
     model = YOLO(model_path)
-
     cap = cv2.VideoCapture(video_path)
-    assert cap.isOpened(), "Failed to open video"
+    if not cap.isOpened():
+        print("Failed to open video")
+        return
 
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
     tfc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
     out = cv2.VideoWriter(
         output_path,
         cv2.VideoWriter_fourcc(*"mp4v"),
         fps,
         (w, h)
     )
+
     frame_no = 0
     RIGHT_CHAIN = [
-     #   ("head", 0),
         ("shoulder", 6),
         ("hip", 12),
         ("knee", 14),
@@ -108,56 +110,72 @@ def mark_right_side_pose(
 
         results = model(frame, conf=conf, verbose=False)
         frame_no += 1
-        if video_obj and int(frame_no / tfc * 100) % 10 == 0:
-            video_obj.progress = int(frame_no / tfc * 100)
+
+        # Safe Progress Update
+        if video_obj and tfc > 0 and (frame_no % max(1, int(tfc / 10)) == 0):
+            video_obj.progress = int((frame_no / tfc) * 100)
             video_obj.save(update_fields=["progress"])
 
-        if results and results[0].keypoints is not None:
+        # Check if results and keypoints exist
+        if results and len(results[0].keypoints.xy) > 0:
+            # results[0].keypoints.xy is a tensor of shape [NumPersons, 17, 2]
             kpts_all = results[0].keypoints.xy.cpu().numpy()
-            if len(kpts_all) > 0:
-                person = kpts_all[0]  # first detected person
-
+            
+            # Ensure the first person has actual data (shape [17, 2])
+            if kpts_all.shape[0] > 0 and kpts_all[0].shape[0] > 16:
+                person = kpts_all[0]
                 points = []
+
                 for _, idx in RIGHT_CHAIN:
-                    x, y = person[idx]
-                    if x > 0 and y > 0:
-                        points.append((int(x), int(y)))
+                    # Double check index safety against the person array size
+                    if idx < len(person):
+                        x, y = person[idx]
+                        if x > 0 and y > 0:
+                            points.append((int(x), int(y)))
+                        else:
+                            points.append(None)
                     else:
                         points.append(None)
 
-                # draw points
+                # Draw Points
                 for p in points:
                     if p is not None:
                         cv2.circle(frame, p, 6, (0, 255, 0), -1)
-                all_points_exist = all(p is not None for p in points)
-                if None not in points:
+
+                # Logic only if ALL points are detected
+                if all(p is not None for p in points):
                     shoulder, hip, knee, ankle = points
-                    draw_angle(
-                        frame,
-                        shoulder,  # a
-                        hip,  # b (vertex)
-                        knee  # c
-                    )
-                    hipdelta, kneedalta = calculate_plank_angles(shoulder , hip, knee, ankle)
+                    
+                    # Wrap draw_angle in try-except in case of math errors (div by zero)
+                    try:
+                        draw_angle(frame, shoulder, hip, knee)
+                        hipdelta, kneedalta = calculate_plank_angles(shoulder, hip, knee, ankle)
+                        
+                        cv2.putText(
+                            frame,
+                            f"Core Engagement: {core_engagement_level(hipdelta)}",
+                            (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1.0,
+                            (0, 255, 255),
+                            2,
+                            cv2.LINE_AA
+                        )
+                    except Exception as e:
+                        print(f"Drawing/Angle error: {e}")
 
-                    cv2.putText(
-                        frame,
-                        f"Corengagement : {core_engagement_level(hipdelta)}",
-                        (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX,  # font
-                        1.0,  # font scale
-                        (0, 255, 255),  # color (B, G, R)
-                        2,  # thickness
-                        cv2.LINE_AA
-                    )
-
+                # Draw skeleton lines (only between valid consecutive points)
                 for p1, p2 in zip(points[:-1], points[1:]):
                     if p1 is not None and p2 is not None:
                         cv2.line(frame, p1, p2, (255, 0, 0), 2)
 
+                # Draw long line (Shoulder to Ankle)
                 if points[0] is not None and points[-1] is not None:
                     cv2.line(frame, points[0], points[-1], (0, 0, 255), 2)
-
+            else:
+                # No person detected in this specific frame, write original frame
+                pass
+        
         out.write(frame)
 
     cap.release()
