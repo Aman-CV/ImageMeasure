@@ -32,8 +32,11 @@ AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_QUERYSTRING_AUTH = True
-DP_PASS = os.getenv("DP_PASS")
-
+DB_PASSKEY = os.getenv("DB_PASSKEY")
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PORT = os.getenv("DB_PORT")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -87,24 +90,35 @@ WSGI_APPLICATION = 'Measure.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
 #         'NAME': 'mydb',
 #         'USER': 'postgres',
-#         'PASSWORD': DP_PASS,
+#         'PASSWORD': DP_PASSKEY,
 #         'HOST': 'localhost',
 #         'PORT': '5432',
 #     }
 # }
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': DB_NAME,
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSKEY,
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
+        'CONN_MAX_AGE': 0
+    }
+}
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
