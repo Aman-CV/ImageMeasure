@@ -83,16 +83,16 @@ class PetVideos(models.Model):
                 assessment_id=self.assessment_id,
             )
 
-        elif self.type_param in ("upper body strength", "throw"):
+        elif self.type_param.lower() in ("upper body strength", "throw"):
             return celery_process_sit_and_throw.delay(
                 self.id,
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
             )
-        elif self.type_param in ("endurance", "sprint speed", "agility"):
+        elif self.type_param.lower() in ("endurance", "sprint speed", "agility"):
             return celery_process_15m_dash.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
 
-        elif self.type_param in ("core strength",):
+        elif self.type_param.lower() in ("core strength",):
             return celery_process_plank.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
 
         return celery_process_video_task.delay(
