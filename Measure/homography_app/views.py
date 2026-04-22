@@ -78,7 +78,7 @@ def _create_1fps_video_file(uploaded_video):
         'ffmpeg',
         '-y',
         '-i', temp_input_path,
-        '-vf', 'fps=1,setpts=N/30/TB',
+        '-vf', 'fps=5,setpts=N/30/TB',
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', '23',
