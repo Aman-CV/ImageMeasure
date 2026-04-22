@@ -146,12 +146,20 @@ class SingletonHomographicMatrixModel(models.Model):
     end_pixel = models.IntegerField(default=1)
     start_pixel_broad_jump = models.IntegerField(default = 1)
     class Meta:
-        constraints = [
-            CheckConstraint(
-                condition=Q(id=1),
-                name='only_one_instance'
-            )
-        ]
+        try:
+            constraints = [
+                CheckConstraint(
+                    condition=Q(id=1),
+                    name='only_one_instance'
+                )
+            ]
+        except Exception as e:
+            checks = [
+                CheckConstraint(
+                    check=Q(id=1),
+                    name='only_one_instance'
+                )
+            ]
 
     def save(self, *args, **kwargs):
         if not self.pk and SingletonHomographicMatrixModel.objects.exists():

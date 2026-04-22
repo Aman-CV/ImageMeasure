@@ -26,7 +26,7 @@ logger = logging.getLogger('homography_app')
 
 _RETRY_COUNTDOWN = 60   # seconds to wait before re-checking memory
 _MAX_RETRIES = 120      # 120 × 60 s = ~2 hours ceiling
-_CONCURRENT_THRESHOLD = 3  # only enforce memory check when this many tasks are already running
+_CONCURRENT_THRESHOLD = 4  # only enforce memory check when this many tasks are already running
 
 
 def _active_task_count():
