@@ -2,14 +2,16 @@
 WSGI config for Measure project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
 """
 
 import os
+import warnings
 
 from django.core.wsgi import get_wsgi_application
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Measure.settings')
 
