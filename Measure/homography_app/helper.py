@@ -884,7 +884,7 @@ def segment_object_sam(
         point = (w // 2, h // 2)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    sam = sam_model_registry["vit_t"](checkpoint="mobile_sam.pth")
+    sam = sam_model_registry["vit_t"](checkpoint="mobile_sam.pt")
     sam.to(device)
     predictor = SamPredictor(sam)
 
