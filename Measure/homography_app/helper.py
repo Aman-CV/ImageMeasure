@@ -13,16 +13,11 @@ from dotenv import load_dotenv
 import os
 import torch
 import numpy as np
-from segment_anything import sam_model_registry, SamPredictor
+from mobile_sam import sam_model_registry , SamPredictor
 
 load_dotenv()
 
 TOKEN = os.getenv("VIDEO_UPLOAD_TOKEN")
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-sam = sam_model_registry["vit_b"](checkpoint="sam_vit_b_01ec64.pth")
-sam.to(device)
-predictor = SamPredictor(sam)
 
 def order_quad_points(pts):
     """
@@ -888,7 +883,10 @@ def segment_object_sam(
     ):
         point = (w // 2, h // 2)
 
-
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    sam = sam_model_registry["vit_t"](checkpoint="mobile_sam.pth")
+    sam.to(device)
+    predictor = SamPredictor(sam)
 
     # ---- Prepare image ----
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
