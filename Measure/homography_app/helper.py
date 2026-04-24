@@ -19,6 +19,10 @@ load_dotenv()
 
 TOKEN = os.getenv("VIDEO_UPLOAD_TOKEN")
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+sam = sam_model_registry["vit_b"](checkpoint="sam_vit_b_01ec64.pth")
+sam.to(device)
+predictor = SamPredictor(sam)
 
 def order_quad_points(pts):
     """
@@ -884,18 +888,12 @@ def segment_object_sam(
     ):
         point = (w // 2, h // 2)
 
-    # ---- Device ----
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # ---- Load SAM ----
-    sam = sam_model_registry["vit_b"](checkpoint=checkpoint)
-    sam.to(device)
-    predictor = SamPredictor(sam)
 
     # ---- Prepare image ----
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-    predictor.set_image(image_rgb)
+    with torch.inference_mode():
+        predictor.set_image(image_rgb)
 
     # ---- Predict ----
     input_points = np.array([[point[0], point[1]]])
