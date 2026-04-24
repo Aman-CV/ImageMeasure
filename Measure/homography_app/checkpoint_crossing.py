@@ -374,7 +374,6 @@ def detect_crossing_person_box_reverse_nobuffer(
                 cv2.destroyAllWindows()
                 frame_number = frame_number - 1
                 current_time = frame_number / fps
-                print(f"Crossing detected at frame {frame_number}, time {current_time:.2f} seconds")
                 return frame_number, current_time, output_image_path
 
             prev_x = x_pos
@@ -386,8 +385,7 @@ def detect_crossing_person_box_reverse_nobuffer(
                 break
     cap.release()
     cv2.destroyAllWindows()
-    print("No crossing detected, returning last frame", total_frames)
-    return int(total_frames - fps), (total_frames - fps) / fps, output_image_path
+    return int(total_frames - 1), (total_frames - 1) / fps, output_image_path
 
 def write_video_until_frame(
     video_path,

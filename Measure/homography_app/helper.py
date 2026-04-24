@@ -91,7 +91,8 @@ def get_mask_corners(mask):
 
 def test_video_url(assessment_id, test_id, participant_id, vurl):
     # domain = "http://127.0.0.1:8000"
-    domain = "http://ec2-13-126-18-144.ap-south-1.compute.amazonaws.com"
+    # domain = "http://ec2-13-126-18-144.ap-south-1.compute.amazonaws.com"
+    domain = "https://netplay.co.in/"
     url = f"{domain}/api/coaching/assessment/member/video_upload/"
     # Test payload with multiple users
     payload = {
