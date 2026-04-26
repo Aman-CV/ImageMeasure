@@ -90,13 +90,13 @@ def _create_1fps_video_file(uploaded_video):
     return temp_input_path, temp_output_path
 
 
-def _cache_video_for_worker(video_obj):
+def _cache_video_for_worker(video_obj, unique_id=""):
     """Store an h264 worker-local copy at TEMP_VIDEO_STORAGE/videot_<id>.mp4."""
     os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
 
     ext = os.path.splitext(video_obj.file.name)[1].lower() or '.mp4'
-    raw_path = os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}_raw{ext}")
-    final_path = os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}.mp4")
+    raw_path = os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}_{unique_id}_raw{ext}")
+    final_path = os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}_{unique_id}.mp4")
 
     with video_obj.file.open('rb') as src, open(raw_path, 'wb') as destination:
         for chunk in src.chunks():
@@ -123,15 +123,15 @@ def _cache_video_for_worker(video_obj):
         print('Deleted raw upload:', raw_path)
 
 
-def _dispatch_processing_task(test_type, video_id, test_id, assessment_id, enable_color_marker_tracking, enable_start_end_detector):
+def _dispatch_processing_task(test_type, video_id, test_id, assessment_id, enable_color_marker_tracking, enable_start_end_detector, unique_id=""):
     if test_type == 'upper body strength' or test_type == 'throw':
-        celery_process_sit_and_throw.delay(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_sit_and_throw.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
     elif test_type == 'flexibility' or test_type == 'reach':
-        celery_process_sit_and_reach.delay(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_sit_and_reach.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
     elif test_type in ('endurance', 'sprint speed', 'agility'):
-        celery_process_15m_dash.delay(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_15m_dash.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
     elif test_type == 'core strength':
-        celery_process_plank.delay(video_id, test_id=test_id, assessment_id=assessment_id)
+        celery_process_plank.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
     else:
         celery_process_video_task.delay(
             video_id,
@@ -139,6 +139,7 @@ def _dispatch_processing_task(test_type, video_id, test_id, assessment_id, enabl
             enable_start_end_detector=enable_start_end_detector,
             test_id=test_id,
             assessment_id=assessment_id,
+            unique_id=unique_id
         )
 
 
@@ -167,7 +168,8 @@ def upload_video(request):
     if type_param is not None:
         type_param = type_param.lower()
     os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
-
+    import time, random
+    unique_id = f"{int(time.time())}_{random.randint(1,199)}"
     if type_param == 'core strength':
         temp_input_path = None
         temp_output_path = None
@@ -208,7 +210,7 @@ def upload_video(request):
                 type_param = type_param
             )
         )
-        _cache_video_for_worker(obj)
+        _cache_video_for_worker(obj, unique_id)
 
     _dispatch_processing_task(
         obj.type_param,
@@ -217,6 +219,7 @@ def upload_video(request):
         assessment_id,
         enable_color_marker_tracking,
         enable_start_end_detector,
+        unique_id=unique_id
     )
 
     return JsonResponse({

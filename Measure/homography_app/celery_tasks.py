@@ -52,15 +52,15 @@ def _check_or_retry(task):
 
 
 @shared_task(bind=True, ignore_result=True, name='homography_app.celery_process_sit_and_throw')
-def celery_process_sit_and_throw(self, petvideo_id, test_id='', assessment_id=''):
+def celery_process_sit_and_throw(self, petvideo_id, test_id='', assessment_id='', unique_id=''):
     _check_or_retry(self)
-    _process_sit_and_throw(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+    _process_sit_and_throw(petvideo_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
 
 
 @shared_task(bind=True, ignore_result=True, name='homography_app.celery_process_sit_and_reach')
-def celery_process_sit_and_reach(self, petvideo_id, test_id='', assessment_id=''):
+def celery_process_sit_and_reach(self, petvideo_id, test_id='', assessment_id='', unique_id=''):
     _check_or_retry(self)
-    _process_sit_and_reach(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+    _process_sit_and_reach(petvideo_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
 
 
 @shared_task(bind=True, ignore_result=True, name='homography_app.celery_process_video_task')
@@ -71,6 +71,7 @@ def celery_process_video_task(
     enable_start_end_detector=True,
     test_id='',
     assessment_id='',
+    unique_id='',
 ):
     _check_or_retry(self)
     _process_video_task(
@@ -79,16 +80,17 @@ def celery_process_video_task(
         enable_start_end_detector=enable_start_end_detector,
         test_id=test_id,
         assessment_id=assessment_id,
+        unique_id=unique_id,
     )
 
 
 @shared_task(bind=True, ignore_result=True, name='homography_app.celery_process_15m_dash')
-def celery_process_15m_dash(self, petvideo_id, test_id='', assessment_id=''):
+def celery_process_15m_dash(self, petvideo_id, test_id='', assessment_id='', unique_id=''):
     _check_or_retry(self)
-    _process_15m_dash(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+    _process_15m_dash(petvideo_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
 
 
 @shared_task(bind=True, ignore_result=True, name='homography_app.celery_process_plank')
-def celery_process_plank(self, petvideo_id, test_id='', assessment_id=''):
+def celery_process_plank(self, petvideo_id, test_id='', assessment_id='', unique_id=''):
     _check_or_retry(self)
-    _process_plank(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+    _process_plank(petvideo_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)

@@ -68,6 +68,9 @@ class PetVideos(models.Model):
         self.is_video_processed = False if self.to_be_processed else True
         self.progress = 0
         self.save()
+        
+        import time, random
+        unique_id = f"{int(time.time())}_{random.randint(1,199)}"
         from .celery_tasks import (
             celery_process_sit_and_reach,
             celery_process_sit_and_throw,
@@ -81,6 +84,7 @@ class PetVideos(models.Model):
                 self.id,
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
+                unique_id=unique_id,
             )
 
         elif self.type_param.lower() in ("upper body strength", "throw"):
@@ -88,17 +92,19 @@ class PetVideos(models.Model):
                 self.id,
                 test_id=self.test_id,
                 assessment_id=self.assessment_id,
+                unique_id=unique_id,
             )
         elif self.type_param.lower() in ("endurance", "sprint speed", "agility", "0"):
-            return celery_process_15m_dash.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
+            return celery_process_15m_dash.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id, unique_id=unique_id)
 
         elif self.type_param.lower() in ("core strength",):
-            return celery_process_plank.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id)
+            return celery_process_plank.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id, unique_id=unique_id)
 
         return celery_process_video_task.delay(
             self.id,
             test_id=self.test_id,
             assessment_id=self.assessment_id,
+            unique_id=unique_id,
         )
 
 

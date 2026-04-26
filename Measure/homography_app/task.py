@@ -30,13 +30,13 @@ def check_memory_available(min_gb: float = 2.0) -> bool:
     """Return True if at least *min_gb* GB of RAM is currently available."""
     return psutil.virtual_memory().available >= min_gb * 1024 ** 3
 
-def _legacy_video_path(video_obj):
+def _legacy_video_path(video_obj, unique_id=""):
     ext = os.path.splitext(os.path.basename(video_obj.file.name))[1]
-    return os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}{ext}")
+    return os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}_{unique_id}{ext}")
 
 
-def _canonical_video_path(video_obj):
-    return os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}.mp4")
+def _canonical_video_path(video_obj, unique_id=""):
+    return os.path.join(settings.TEMP_VIDEO_STORAGE, f"videot_{video_obj.id}_{unique_id}.mp4")
 
 
 def _remove_files(*paths):
@@ -45,8 +45,8 @@ def _remove_files(*paths):
             os.remove(path)
 
 
-def _cleanup_local_video(video_obj):
-    _remove_files(_legacy_video_path(video_obj), _canonical_video_path(video_obj))
+def _cleanup_local_video(video_obj, unique_id):
+    _remove_files(_legacy_video_path(video_obj, unique_id), _canonical_video_path(video_obj, unique_id))
 
 
 def _encode_to_h264(input_path, output_path, resolution=None, fps=None):
@@ -107,16 +107,16 @@ def _encode_to_h264(input_path, output_path, resolution=None, fps=None):
         raise RuntimeError(f"FFmpeg encoding failed: {e}")
 
 
-def _ensure_local_video(video_obj):
+def _ensure_local_video(video_obj, unique_id):
     """Stage 1: make sure a local processing video is available and return its path."""
-    mp4_path = _canonical_video_path(video_obj)
-    legacy_path = _legacy_video_path(video_obj)
+    mp4_path = _canonical_video_path(video_obj, unique_id)
+    legacy_path = _legacy_video_path(video_obj, unique_id)
     if os.path.exists(mp4_path):
         return mp4_path
     if os.path.exists(legacy_path):
         return legacy_path
 
-    downloaded_path = download_and_save_video(video_obj)
+    downloaded_path = download_and_save_video(video_obj, unique_id)
     if os.path.exists(downloaded_path):
         return downloaded_path
 
@@ -147,29 +147,26 @@ def _save_processed_file(video_obj, output_path, original_name):
         raise 
 
 
-def download_and_save_video(obj):
+def download_and_save_video(obj, unique_id=""):
     video = obj.file
 
     os.makedirs(settings.TEMP_VIDEO_STORAGE, exist_ok=True)
 
     ext = os.path.splitext(video.name)[1] or ".mp4"
-
     raw_path = os.path.join(
         settings.TEMP_VIDEO_STORAGE,
-        f"raw_{obj.id}{ext}"
+        f"raw_{obj.id}_{unique_id}{ext}"
     )
-
     with video.open("rb") as src, open(raw_path, "wb") as destination:
         for chunk in src.chunks():
             destination.write(chunk)
         destination.flush()
         os.fsync(destination.fileno())
 
-    print("Raw video size:", os.path.getsize(raw_path))
-
+    print("Raw video size:", os.path.getsize(raw_path), unique_id)
     final_path = os.path.join(
         settings.TEMP_VIDEO_STORAGE,
-        f"videot_{obj.id}.mp4"
+        f"videot_{obj.id}_{unique_id}.mp4"
     )
 
     subprocess.run(
@@ -196,11 +193,11 @@ def download_and_save_video(obj):
 
 
 
-def _process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
-    return process_sit_and_throw(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+def _process_sit_and_throw(petvideo_id, test_id="", assessment_id="", unique_id=""):
+    return process_sit_and_throw(petvideo_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
 
 
-def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
+def process_sit_and_throw(petvideo_id, test_id="", assessment_id="", unique_id=""):
     if test_id == "" or assessment_id == "":
         logger.error(f"sit_and_throw: missing test_id or assessment_id (video={petvideo_id})")
         return
@@ -217,7 +214,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    video_path = _ensure_local_video(video_obj)
+    video_path = _ensure_local_video(video_obj, unique_id)
 
     output_dir = os.path.join(settings.TEMP_STORAGE, 'post_processed_video')
     os.makedirs(output_dir, exist_ok=True)
@@ -231,7 +228,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         use_homograph = homograph_obj.use_homograph if homograph_obj else False
         if not homograph_obj:
             raise Exception(f"Calibration data not found for assessment_id: {assessment_id} and test_id: {test_id}")
-        opth = f"motion_output_{petvideo_id}.mp4"
+        opth = f"motion_output_{petvideo_id}_{unique_id}.mp4"
         cx, cy, cf = get_first_bounce_frame_MOG(video_path,
                     start_cutoff=(homograph_obj.origin_x + 10.0)/1280.0 if homograph_obj.start_pixel !=0 else 0.25, video_obj=video_obj, output_pth=opth)
         if cx is None or cy is None:
@@ -262,7 +259,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         video_obj.progress = 100
         original_name = os.path.basename(video_obj.file.name)
 
-        final_output_path = f"temp_media_store/processed_{original_name}"
+        final_output_path = f"temp_media_store/processed_{unique_id}_{original_name}"
 
         if is_changed:
             # Apply low-quality encoding (360p, 15fps) only to files being saved
@@ -271,7 +268,7 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         else:
             _encode_to_h264(opth, final_output_path)
         _remove_files(final_output_path, opth)
-        _cleanup_local_video(video_obj)
+        _cleanup_local_video(video_obj, unique_id)
         video_obj.save()
 
         test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
@@ -281,11 +278,11 @@ def process_sit_and_throw(petvideo_id, test_id="", assessment_id=""):
         logger.error(f"sit_and_throw failed: video={petvideo_id} — {e}", exc_info=True)
 
 
-def _process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
-    return process_sit_and_reach(petvideo_id, test_id=test_id, assessment_id=assessment_id)
+def _process_sit_and_reach(petvideo_id, test_id="", assessment_id="", unique_id=""):
+    return process_sit_and_reach(petvideo_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
 
 
-def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
+def process_sit_and_reach(petvideo_id, test_id="", assessment_id="", unique_id=""):
     if len(test_id) == 0 or len(assessment_id) == 0:
         logger.error(f"sit_and_reach: missing test_id or assessment_id (video={petvideo_id})")
         return
@@ -296,7 +293,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
         except PetVideos.DoesNotExist:
             logger.error(f"sit_and_reach: PetVideo {petvideo_id} not found in DB")
             return
-        video_path = _ensure_local_video(video_obj)
+        video_path = _ensure_local_video(video_obj, unique_id)
 
         try:
             video_obj.is_video_processed = False
@@ -308,7 +305,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             use_homograph = homograph_obj.use_homograph if homograph_obj else False
             if not homograph_obj:
                 raise Exception(f"Calibration data not found for assessment_id: {assessment_id} and test_id: {test_id}")
-            opth = f"motion_output_{petvideo_id}.mp4"
+            opth = f"motion_output_{petvideo_id}_{unique_id}.mp4"
             distance, pt1, pt2 = middle_finger_movement_distance(video_path, video_obj=video_obj, output_pth=opth, target_y=[homograph_obj.origin_x, homograph_obj.origin_y] if homograph_obj.origin_y != 0 else None)
 
             if not distance:
@@ -331,7 +328,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
                     distance = 15.0 - distance
 
             original_name = os.path.basename(video_obj.file.name)
-            final_output_path = f"temp_media_store/processed_{original_name}"
+            final_output_path = f"temp_media_store/processed_{unique_id}_{original_name}"
 
 
             #----#
@@ -356,7 +353,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
             video_obj.progress = 100
             video_obj.save()
             _remove_files(opth)
-            _cleanup_local_video(video_obj)
+            _cleanup_local_video(video_obj, unique_id)
             test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
             logger.info(f"sit_and_reach done: video={petvideo_id} distance={round(distance, 3) if distance else 'N/A'}m")
         except Exception as e:
@@ -364,12 +361,12 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id=""):
         return
 
 
-def _process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id=""):
-    return process_video_task(petvideo_id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id)
+def _process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id="", unique_id=""):
+    return process_video_task(petvideo_id, enable_color_marker_tracking=enable_color_marker_tracking, enable_start_end_detector=enable_start_end_detector, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
 
 
 
-def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id=""):
+def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_start_end_detector=True, test_id="", assessment_id="", unique_id=""):
     if test_id == "" or assessment_id == "":
         logger.error(f"broad_jump: missing test_id or assessment_id (video={petvideo_id})")
         return
@@ -401,14 +398,14 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         # test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
         logger.info(f"broad_jump: video {petvideo_id} flagged to skip processing")
         return
-    video_path = _ensure_local_video(video_obj)
+    video_path = _ensure_local_video(video_obj, unique_id)
     original_name = os.path.basename(video_obj.file.name)
 
     output_dir = "temp_media_store"
     os.makedirs(output_dir, exist_ok=True)
 
-    temp_output_path = os.path.join(output_dir, f"temp_{original_name}")
-    final_output_path = os.path.join(output_dir, f"processed_{original_name}")
+    temp_output_path = os.path.join(output_dir, f"temp_{unique_id}_{original_name}")
+    final_output_path = os.path.join(output_dir, f"processed_{unique_id}_{original_name}")
     try:
         cap = cv2.VideoCapture(video_path)
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -598,7 +595,7 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         else:
             _encode_to_h264(temp_output_path, final_output_path)
         video_obj.save()
-        _cleanup_local_video(video_obj)
+        _cleanup_local_video(video_obj, unique_id)
         _remove_files(temp_output_path, final_output_path)
         test_video_url(assessment_id, test_id, video_obj.participant_id, video_obj.processed_file.url)
         logger.info(f"broad_jump done: video={petvideo_id} distance={round(distance_ft, 3)}m")
@@ -607,12 +604,12 @@ def process_video_task(petvideo_id, enable_color_marker_tracking=True, enable_st
         logger.error(f"broad_jump failed: video={petvideo_id} — {e}", exc_info=True)
 
 
-def _process_15m_dash(petvideo_id, test_id, assessment_id):
-    return process_15m_dash(petvideo_id, test_id, assessment_id)
+def _process_15m_dash(petvideo_id, test_id, assessment_id, unique_id=""):
+    return process_15m_dash(petvideo_id, test_id, assessment_id, unique_id)
 
 
-def process_15m_dash(petvideo_id, test_id, assessment_id):
-    process_ttest_6x15_dash(petvideo_id, test_id, assessment_id)
+def process_15m_dash(petvideo_id, test_id, assessment_id, unique_id=""):
+    process_ttest_6x15_dash(petvideo_id, test_id, assessment_id, unique_id)
     return
     logger.info(f"[process_video_task] STARTED TEST/ ASSESSMENT ID: {petvideo_id}")
     if test_id == "" or assessment_id == "":
@@ -687,11 +684,11 @@ def process_15m_dash(petvideo_id, test_id, assessment_id):
         logger.error(f"[process_video_task] Error processing PetVideo ID {petvideo_id}: {e}", exc_info=True)
 
 
-def _process_plank(petvideo_id, test_id, assessment_id):
-    return process_plank(petvideo_id, test_id, assessment_id)
+def _process_plank(petvideo_id, test_id, assessment_id, unique_id=""):
+    return process_plank(petvideo_id, test_id, assessment_id, unique_id)
 
 
-def process_plank(petvideo_id, test_id, assessment_id):
+def process_plank(petvideo_id, test_id, assessment_id, unique_id=""):
     if test_id == "" or assessment_id == "":
         logger.error(f"plank: missing test_id or assessment_id (video={petvideo_id})")
         return
@@ -708,7 +705,7 @@ def process_plank(petvideo_id, test_id, assessment_id):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    video_path = _ensure_local_video(video_obj)
+    video_path = _ensure_local_video(video_obj, unique_id)
     if video_obj.processed_file:
         video_obj.processed_file.delete(save=False)
         video_obj.processed_file = None
@@ -722,9 +719,9 @@ def process_plank(petvideo_id, test_id, assessment_id):
 
 
         original_name = os.path.basename(video_obj.file.name)
-        opth = f"motion_output_{petvideo_id}.mp4"
+        opth = f"motion_output_{petvideo_id}_{unique_id}.mp4"
         mark_right_side_pose(video_path, conf=0.2,video_obj=video_obj, output_path=opth)
-        final_output_path = f"temp_media_store/processed_{original_name}"
+        final_output_path = f"temp_media_store/processed_{unique_id}_{original_name}"
         video_obj.distance = 0.0
         video_obj.is_video_processed = True
         video_obj.progress = 100
@@ -733,7 +730,7 @@ def process_plank(petvideo_id, test_id, assessment_id):
 
         _save_processed_file(video_obj, final_output_path, original_name)
         _remove_files(final_output_path)
-        _cleanup_local_video(video_obj)
+        _cleanup_local_video(video_obj, unique_id)
         video_obj.save()
         _remove_files(opth)
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id,
@@ -744,7 +741,7 @@ def process_plank(petvideo_id, test_id, assessment_id):
         logger.error(f"plank failed: video={petvideo_id} — {e}", exc_info=True)
 
 
-def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
+def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id, unique_id=""):
     if test_id == "" or assessment_id == "":
         logger.error(f"6x15_dash: missing test_id or assessment_id (video={petvideo_id})")
         return
@@ -761,7 +758,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
     #         video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
     #     logger.info(f"[process_video_task] Video requires no processing time recorded: {petvideo_id}")
     #     return
-    video_path = _ensure_local_video(video_obj)
+    video_path = _ensure_local_video(video_obj, unique_id)
 
     #with open(video_path, 'rb') as f:
     #    video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
@@ -784,8 +781,8 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         duration =  - 3.5
         original_name = os.path.basename(video_obj.file.name)
 
-        final_output_path = f"temp_media_store/processed_{original_name}"
-        opth = f"motion_output_{petvideo_id}.mp4"
+        final_output_path = f"temp_media_store/processed_{unique_id}_{original_name}"
+        opth = f"motion_output_{petvideo_id}_{unique_id}.mp4"
         is_changed = False
         if duration < 0.5:
             logger.info(f"6x15_dash: running crossing detector for video {petvideo_id}")
@@ -804,7 +801,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
                     video_obj.is_video_processed = True
                     video_obj.progress = 100
                     video_obj.processed_file.save(os.path.basename(video_obj.file.name), File(f), save=True)
-                _cleanup_local_video(video_obj)
+                _cleanup_local_video(video_obj, unique_id)
                 logger.warning(f"6x15_dash: crossing not detected for video {petvideo_id}, keeping original file")
                 return
         video_obj.distance = homograph_obj.unit_distance
@@ -817,7 +814,7 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id):
         else:
             _encode_to_h264(opth, final_output_path)
         _remove_files(final_output_path, opth)
-        _cleanup_local_video(video_obj)
+        _cleanup_local_video(video_obj, unique_id)
         video_obj.save()
         test_video_url(assessment_id, test_id, participant_id=video_obj.participant_id, vurl=video_obj.processed_file.url)
         logger.info(f"6x15_dash done: video={petvideo_id} duration={round(duration - 3.5, 3)}s")
