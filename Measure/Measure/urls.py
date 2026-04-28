@@ -5,5 +5,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('imagemeasure/admin', admin.site.urls),
     path('', include('homography_app.urls')),
+    
 ]
