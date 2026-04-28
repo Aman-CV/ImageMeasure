@@ -806,6 +806,25 @@ def get_video_detail(request):
             status=404
         )
 
+
+def get_video_link(request):
+    video_id = request.GET.get('id')
+    if not video_id:
+        return JsonResponse({'status': 'error', 'message': 'No video ID provided'}, status=400)
+
+    try:
+        video = PetVideos.objects.get(id=video_id)
+        if not video.processed_file:
+            return JsonResponse({'status': 'error', 'message': 'Processed video not available'}, status=404)
+
+        video_url = PetVideos.objects.get(id=video_id).processed_file.url
+
+        return JsonResponse({
+            'status': 'success',
+            'processed_video_url': video_url
+        })
+    except PetVideos.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Video not found'}, status=404)
 # def get_video_detail(request):
 #     video_id = request.GET.get('id')
 #     if not video_id:

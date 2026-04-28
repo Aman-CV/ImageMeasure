@@ -1,11 +1,9 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.conf import settings
-from django.conf.urls.static import static
 
 urlpatterns = [
+    # original
     path('admin/', admin.site.urls),
-    path('imagemeasure/admin', admin.site.urls),
     path('', include('homography_app.urls')),
-    
+    path('imagemeasure/', include('homography_app.urls')),
 ]
