@@ -489,6 +489,41 @@ def detect_crossing_person_box_reverse_nobuffer(
             os.unlink(tmp_reversed)
     
     return result
+
+def write_video_until_frame(
+    video_path,
+    output_path="motion_output.mp4",
+    end_frame_idx=None,  # None = write full video
+    resize_width=1280,
+    resize_height=720,
+    x_B=1200,
+    duration=0.,
+    reference=15.,
+):
+    cap = cv2.VideoCapture(video_path)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    w = resize_width
+    h = resize_height
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+
+
+    frame_idx = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        frame = cv2.resize(frame, (w, h))
+        #cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+
+        if duration > 0.5:
+            speed_mps = reference / duration
+            cv2.putText(
+            frame,
+            f"Time @ {round(duration,3)}s",
             (30, 60),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.0,
