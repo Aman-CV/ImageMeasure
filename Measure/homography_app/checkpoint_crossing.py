@@ -1,4 +1,7 @@
 import cv2
+import os
+import tempfile
+import subprocess
 from ultralytics import YOLO
 
 def detect_crossing_rightmost_ankle(
@@ -297,8 +300,23 @@ def detect_crossing_person_box_reverse_nobuffer(
     show=False,
     video_obj=None,
 ):
+    # Reverse video to a temp file so we can read forward (fast sequential I/O)
+    tmp_fd, tmp_reversed = tempfile.mkstemp(suffix=".mp4")
+    os.close(tmp_fd)
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", video_path, "-vf", "reverse", "-an", tmp_reversed],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        os.unlink(tmp_reversed)
+        tmp_reversed = None
+
+    # Fall back to original seeking if ffmpeg unavailable
+    use_reversed = tmp_reversed is not None
+    cap = cv2.VideoCapture(tmp_reversed if use_reversed else video_path)
+
     model = YOLO("yolov8x.pt")
-    cap = cv2.VideoCapture(video_path)
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -307,120 +325,170 @@ def detect_crossing_person_box_reverse_nobuffer(
     prev_x = None
     cfno = 0
     x_B, y_pos = x_BA
-    for idx in range(total_frames - 1, -1, -1):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = cap.read()
-        if not ret:
-            continue
-        cfno += 1
-        if video_obj and int(cfno / total_frames * 100) % 10 == 0:
-            video_obj.progress = int(cfno / total_frames * 100)
-            video_obj.save(update_fields=["progress"])
-        frame = cv2.resize(frame, (resize_width, resize_height))
-        frame_number = idx + 1
+    result = (None, None, None)
 
-        results = model.track(
-            frame,
-            persist=True,
-            conf=conf,
-            classes=[0],
-            imgsz=384,
-            verbose=False
-        )
+    try:
+        if use_reversed:
+            # Process forward through the reversed video
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                cfno += 1
+                if video_obj and int(cfno / total_frames * 100) % 10 == 0:
+                    video_obj.progress = int(cfno / total_frames * 100)
+                    video_obj.save(update_fields=["progress"])
+                frame = cv2.resize(frame, (resize_width, resize_height))
+                # Map forward index back to original frame number
+                idx = total_frames - cfno
+                frame_number = idx + 1
 
-        r = results[0]
+                results = model.track(
+                    frame, persist=True, conf=conf, classes=[0], imgsz=384, verbose=False
+                )
+                r = results[0]
+                if r.boxes is None or r.boxes.id is None:
+                    continue
 
-        if r.boxes is None or r.boxes.id is None:
-            continue
+                ids = r.boxes.id.cpu().numpy().astype(int)
+                boxes = r.boxes.xyxy.cpu().numpy()
 
-        ids = r.boxes.id.cpu().numpy().astype(int)
-        boxes = r.boxes.xyxy.cpu().numpy()
+                if target_id is None:
+                    max_y2 = 0
+                    x_tresh = 0.17 * resize_width
+                    y_tresh = 0.3 * resize_height
+                    for box, track_id in zip(boxes, ids):
+                        x1, y1, x2, y2 = box
+                        x_pos = x1 + 0.5 * (x2 - x1)
+                        dist = abs(x_pos - x_B)
+                        if dist <= x_tresh and y2 > max_y2 and y2 > y_tresh:
+                            max_y2 = y2
+                            target_id = track_id
+                            prev_x = x_pos
+                    if target_id is None:
+                        continue
 
-        if target_id is None:
-            max_y2 = 0
-            x_tresh = 0.17 * resize_width
-            y_tresh = 0.3 * resize_height
-            for box, track_id in zip(boxes, ids):
-                x1, y1, x2, y2 = box
+                for box, track_id in zip(boxes, ids):
+                    if track_id != target_id:
+                        continue
+                    x1, y1, x2, y2 = box
+                    towards_x1 = 0.9 if abs(x_B - x1) < abs(x_B - x2) else 0.1
+                    x_pos = x1 + (towards_x1) * (x2 - x1)
+                    y_pos = y2
 
-                x_pos = x1 + 0.5 * (x2 - x1)
-                dist = abs(x_pos - x_B)
-
-                if dist <= x_tresh and y2 > max_y2 and y2 > y_tresh:
-                    max_y2 = y2
-                    target_id = track_id
+                    cv2.circle(frame, (int(x1), int(y_pos)), 6, (0, 0, 255), -1)
+                    cv2.circle(frame, (int(x2), int(y_pos)), 6, (255, 0, 0), -1)
+                    cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
+                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+                    if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 8:
+                        cv2.imwrite(output_image_path, frame)
+                        frame_number = frame_number - 1
+                        current_time = frame_number / fps
+                        result = (frame_number, current_time, output_image_path)
+                        break
                     prev_x = x_pos
 
-            if target_id is None:
-                continue
+                if result[0] is not None:
+                    break
 
-        for box, track_id in zip(boxes, ids):
-            if track_id != target_id:
-                continue
+                if show:
+                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+                    cv2.imshow("Reverse Processing", frame)
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
 
-            x1, y1, x2, y2 = box
-            towards_x1 = 0.9 if abs(x_B - x1) < abs(x_B - x2) else 0.1
-            x_pos = x1 + (towards_x1) * (x2 - x1)
-            y_pos = y2
+            if result[0] is None:
+                result = (int(total_frames - 1), (total_frames - 1) / fps, output_image_path)
+        else:
+            # Fallback: original backward-seeking approach
+            for idx in range(total_frames - 1, -1, -1):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, frame = cap.read()
+                if not ret:
+                    continue
+                cfno += 1
+                if video_obj and int(cfno / total_frames * 100) % 10 == 0:
+                    video_obj.progress = int(cfno / total_frames * 100)
+                    video_obj.save(update_fields=["progress"])
+                frame = cv2.resize(frame, (resize_width, resize_height))
+                frame_number = idx + 1
 
-            # visualization
-            cv2.circle(frame, (int(x1), int(y_pos)), 6, (0, 0, 255), -1)
-            cv2.circle(frame, (int(x2), int(y_pos)), 6, (255, 0, 0), -1)
-            cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
-            cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-            if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 8:
-                cv2.imwrite(output_image_path, frame)
-                cap.release()
-                cv2.destroyAllWindows()
-                frame_number = frame_number - 1
-                current_time = frame_number / fps
-                return frame_number, current_time, output_image_path
+                results = model.track(
+                    frame,
+                    persist=True,
+                    conf=conf,
+                    classes=[0],
+                    imgsz=384,
+                    verbose=False
+                )
 
-            prev_x = x_pos
+                r = results[0]
 
-        if show:
-            cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-            cv2.imshow("Reverse Processing", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
-    cap.release()
-    cv2.destroyAllWindows()
-    return int(total_frames - 1), (total_frames - 1) / fps, output_image_path
+                if r.boxes is None or r.boxes.id is None:
+                    continue
 
-def write_video_until_frame(
-    video_path,
-    output_path="motion_output.mp4",
-    end_frame_idx=None,  # None = write full video
-    resize_width=1280,
-    resize_height=720,
-    x_B=1200,
-    duration=0.,
-    reference=15.,
-):
-    cap = cv2.VideoCapture(video_path)
+                ids = r.boxes.id.cpu().numpy().astype(int)
+                boxes = r.boxes.xyxy.cpu().numpy()
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    w = resize_width
-    h = resize_height
+                if target_id is None:
+                    max_y2 = 0
+                    x_tresh = 0.17 * resize_width
+                    y_tresh = 0.3 * resize_height
+                    for box, track_id in zip(boxes, ids):
+                        x1, y1, x2, y2 = box
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+                        x_pos = x1 + 0.5 * (x2 - x1)
+                        dist = abs(x_pos - x_B)
 
+                        if dist <= x_tresh and y2 > max_y2 and y2 > y_tresh:
+                            max_y2 = y2
+                            target_id = track_id
+                            prev_x = x_pos
 
-    frame_idx = 0
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+                    if target_id is None:
+                        continue
 
-        frame = cv2.resize(frame, (w, h))
-        #cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+                for box, track_id in zip(boxes, ids):
+                    if track_id != target_id:
+                        continue
 
-        if duration > 0.5:
-            speed_mps = reference / duration
-            cv2.putText(
-            frame,
-            f"Time @ {round(duration,3)}s",
+                    x1, y1, x2, y2 = box
+                    towards_x1 = 0.9 if abs(x_B - x1) < abs(x_B - x2) else 0.1
+                    x_pos = x1 + (towards_x1) * (x2 - x1)
+                    y_pos = y2
+
+                    # visualization
+                    cv2.circle(frame, (int(x1), int(y_pos)), 6, (0, 0, 255), -1)
+                    cv2.circle(frame, (int(x2), int(y_pos)), 6, (255, 0, 0), -1)
+                    cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
+                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+                    if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 8:
+                        cv2.imwrite(output_image_path, frame)
+                        frame_number = frame_number - 1
+                        current_time = frame_number / fps
+                        result = (frame_number, current_time, output_image_path)
+                        break
+
+                    prev_x = x_pos
+
+                if result[0] is not None:
+                    break
+
+                if show:
+                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+                    cv2.imshow("Reverse Processing", frame)
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
+
+            if result[0] is None:
+                result = (int(total_frames - 1), (total_frames - 1) / fps, output_image_path)
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+        if use_reversed and tmp_reversed:
+            os.unlink(tmp_reversed)
+    
+    return result
             (30, 60),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.0,
