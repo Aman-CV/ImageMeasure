@@ -286,7 +286,7 @@ def process_sit_and_reach(petvideo_id, test_id="", assessment_id="", unique_id="
     if len(test_id) == 0 or len(assessment_id) == 0:
         logger.error(f"sit_and_reach: missing test_id or assessment_id (video={petvideo_id})")
         return
-    if test_id == "vPbXoPK4" or test_id == "reach":
+    if True:
         logger.info(f"sit_and_reach started: video={petvideo_id} test={test_id} assessment={assessment_id}")
         try:
             video_obj = PetVideos.objects.get(id=petvideo_id)

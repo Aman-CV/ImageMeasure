@@ -79,7 +79,7 @@ class PetVideos(models.Model):
             celery_process_plank,
         )
 
-        if self.type_param in ("flexibility", "reach"):
+        if self.type_param.lower() in ("flexibility", "reach"):
             return celery_process_sit_and_reach.delay(
                 self.id,
                 test_id=self.test_id,
