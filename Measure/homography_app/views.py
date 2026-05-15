@@ -212,6 +212,9 @@ def upload_video(request):
         )
         _cache_video_for_worker(obj, unique_id)
 
+    from .celery_tasks import enqueue_upload
+    enqueue_upload(obj.id, unique_id)
+
     _dispatch_processing_task(
         obj.type_param,
         obj.id,

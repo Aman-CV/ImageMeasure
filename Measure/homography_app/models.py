@@ -77,7 +77,10 @@ class PetVideos(models.Model):
             celery_process_video_task,
             celery_process_15m_dash,
             celery_process_plank,
+            enqueue_upload,
         )
+
+        enqueue_upload(self.id, unique_id)
 
         if self.type_param.lower() in ("flexibility", "reach"):
             return celery_process_sit_and_reach.delay(
