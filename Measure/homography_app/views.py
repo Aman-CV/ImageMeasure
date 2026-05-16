@@ -35,9 +35,9 @@ DEFAULT_HOMOGRAPH_POINTS = {
 
 FALL_BACK = {
     'flexibility' : 20,
-    'lower body strength' : 1.4224,
+    'lower body strength' : 0.88,
     'default' : 1,
-    'upper body strength' : 1.4224
+    'upper body strength' : 0.88
 }
 
 
@@ -477,10 +477,17 @@ def upload_calibration_video(request):
     if request.method != 'POST' or not request.FILES.get('video'):
         return JsonResponse({'status': 'error', 'message': 'No image uploaded'}, status=400)
 
+    unit_distance = float(request.POST.get('square_size', 2.5908))
+    type_param_raw = request.POST.get('type_param', None)
+    if type_param_raw:
+        type_param_raw = type_param_raw.lower()
+    if 1.1 <= unit_distance <= 1.3 or type_param_raw in {"upper body strength", "lower body strength"}:
+        unit_distance = 0.75
+
     payload = dict(
         video_file=request.FILES['video'],
         test_id=request.POST.get('test_id', 'not_sit_and_reach'),
-        unit_distance=float(request.POST.get('square_size', 2.5908)),
+        unit_distance=unit_distance,
         position_factor=float(request.POST.get('position_factor', 0.5)),
         position_factor2=float(request.POST.get('position_factor2', 0.15)),
         assessment_id=request.POST.get('assessment_id', 'notvalid'),
@@ -488,10 +495,8 @@ def upload_calibration_video(request):
         use_sam_homograph=_as_bool(request.POST.get('use_sam_homograph', 'false'), default=False),
         origin_x=float(request.POST.get('origin_x', 0)),
         origin_y=float(request.POST.get('origin_y', 0)),
-        type_param=request.POST.get('type_param', None)
+        type_param=type_param_raw
     )
-    if payload['type_param'] is not None:
-        payload['type_param'] = payload['type_param'].lower()
     payload['homograph_points'] = _parse_homograph_points(request.POST.get('hpoints', None))
 
     try:
