@@ -35,9 +35,9 @@ DEFAULT_HOMOGRAPH_POINTS = {
 
 FALL_BACK = {
     'flexibility' : 20,
-    'lower body strength' : 0.88,
+    'lower body strength' : 0.80,
     'default' : 1,
-    'upper body strength' : 0.88
+    'upper body strength' : 0.80
 }
 
 
@@ -482,7 +482,7 @@ def upload_calibration_video(request):
     if type_param_raw:
         type_param_raw = type_param_raw.lower()
     if 1.1 <= unit_distance <= 1.3 or type_param_raw in {"upper body strength", "lower body strength"}:
-        unit_distance = 0.75
+        unit_distance = 0.70
 
     payload = dict(
         video_file=request.FILES['video'],
