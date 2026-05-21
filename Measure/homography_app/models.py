@@ -138,6 +138,7 @@ class CalibrationDataModel(models.Model):
     homography_points = models.JSONField(default=dict)
     origin_x = models.IntegerField(default=0)
     origin_y = models.IntegerField(default=0)
+    frame = models.FileField(upload_to='calibrated_images/', blank=True, null=True)
 
     def __str__(self):
         return self.test_id

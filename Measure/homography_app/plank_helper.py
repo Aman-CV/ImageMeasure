@@ -88,6 +88,11 @@ def mark_right_side_pose(
     fps = cap.get(cv2.CAP_PROP_FPS)
     tfc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
+    # Check if video is portrait (height > width) and rotate to landscape
+    is_portrait = h > w
+    if is_portrait:
+        w, h = h, w  # Swap dimensions after rotation
+    
     out = cv2.VideoWriter(
         output_path,
         cv2.VideoWriter_fourcc(*"mp4v"),
@@ -108,6 +113,10 @@ def mark_right_side_pose(
         if not ret:
             break
 
+        # Rotate portrait video to landscape (anti-clockwise)
+        if is_portrait:
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        
         results = model(frame, conf=conf, verbose=False)
         frame_no += 1
 

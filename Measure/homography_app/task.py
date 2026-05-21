@@ -725,8 +725,16 @@ def process_plank(petvideo_id, test_id, assessment_id, unique_id=""):
         video_obj.distance = 0.0
         video_obj.is_video_processed = True
         video_obj.progress = 100
-        # Apply low-quality encoding (360p, 15fps) only to files being saved
-        _encode_to_h264(opth, final_output_path, resolution='360p', fps=15)
+        
+        # Get original video FPS for encoding
+        cap = cv2.VideoCapture(video_path)
+        original_fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        if original_fps <= 0:
+            original_fps = 30  # fallback fps
+        
+        # Apply low-quality encoding (360p) with original FPS
+        _encode_to_h264(opth, final_output_path, resolution='360p', fps=int(original_fps))
 
         _save_processed_file(video_obj, final_output_path, original_name)
         _remove_files(final_output_path)

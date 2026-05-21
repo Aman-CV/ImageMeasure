@@ -357,6 +357,9 @@ def _run_simple_calibration(frame, payload):
 
     # _save_preview_to_singleton(singleton, frame, file_name='frame.jpg')
 
+    # Save frame to model
+    _, buffer = cv2.imencode('.jpg', frame)
+    
     CalibrationDataModel.objects.update_or_create(
         test_id=payload['test_id'],
         assessment_id=payload['assessment_id'],
@@ -367,7 +370,8 @@ def _run_simple_calibration(frame, payload):
             'use_homograph': use_homograph,
             'homography_points': homograph_points,
             'origin_x': int(payload['origin_x'] * w),
-            'origin_y': int(payload['origin_y'] * h)
+            'origin_y': int(payload['origin_y'] * h),
+            'frame': ContentFile(buffer.tobytes(), name='calibration_frame.jpg')
         }
     )
     return JsonResponse({'status': 'success', 'hpoints': homograph_points if homograph_points else {}})
@@ -449,6 +453,9 @@ def _run_homography_calibration(frame, payload):
         point['fx'] = float(order_points[i][0] / float(w))
         point['fy'] = float(order_points[i][1] / float(h))
 
+    # Save frame to model
+    _, buffer = cv2.imencode('.jpg', frame)
+    
     CalibrationDataModel.objects.update_or_create(
         test_id=payload['test_id'],
         assessment_id=payload['assessment_id'],
@@ -459,7 +466,8 @@ def _run_homography_calibration(frame, payload):
             'use_homograph': use_homograph,
             'homography_points': homograph_points,
             'origin_x': int(payload['origin_x'] * w),
-            'origin_y': int(payload['origin_y'] * h)
+            'origin_y': int(payload['origin_y'] * h),
+            'frame': ContentFile(buffer.tobytes(), name='calibration_frame.jpg')
         }
     )
 
