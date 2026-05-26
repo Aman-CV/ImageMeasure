@@ -401,7 +401,7 @@ def _run_homography_calibration(frame, payload):
     if len(points) != 4:
         if len(pt2) == 4:
             points = pt2
-            end_point_of_mat = 'Markers not detected using end points of mat'
+            end_point_of_mat = 'Successful using end points of mat'
             points_sorted = sorted(points, key=lambda p: p[1], reverse=True)
             unit_distance = FALL_BACK.get(payload['type_param'], 1)
         else:
