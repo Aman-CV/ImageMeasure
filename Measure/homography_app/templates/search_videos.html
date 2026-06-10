@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Videos</title>
+    <style>
+        :root {
+            --bg-1: #f8efe2;
+            --bg-2: #d7efe4;
+            --bg-3: #f6cfb8;
+            --ink: #1e2a2f;
+            --card: #ffffff;
+            --accent: #0f766e;
+            --accent-2: #0a5a54;
+            --shadow: rgba(15, 118, 110, 0.25);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 20% 15%, var(--bg-3), transparent 35%),
+                radial-gradient(circle at 80% 85%, #c6e5ff, transparent 30%),
+                linear-gradient(135deg, var(--bg-1), var(--bg-2));
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--accent);
+            margin-bottom: 30px;
+        }
+
+        .search-section {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .search-box button {
+            padding: 12px 24px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+
+        .search-box button:hover {
+            background: var(--accent-2);
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .panel h3 {
+            margin-top: 0;
+            color: var(--accent);
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+        }
+
+        .video-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .video-item {
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .video-item:hover {
+            background: #f5f5f5;
+            border-color: var(--accent);
+        }
+
+        .video-item.selected {
+            background: #e0f2f1;
+            border-color: var(--accent);
+        }
+
+        .video-item .name {
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .video-item .meta {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .detail-section {
+            margin-top: 20px;
+        }
+
+        .detail-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            width: 140px;
+            color: var(--accent-2);
+        }
+
+        .detail-value {
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .detail-value a {
+            color: var(--accent);
+        }
+
+        .calibration-section {
+            margin-top: 20px;
+        }
+
+        .calibration-image {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 2px solid #ddd;
+        }
+
+        .no-data {
+            color: #888;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--accent);
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .btn-small:hover {
+            background: var(--accent-2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Search Pet Videos</h1>
+
+        <div class="search-section">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search by participant name..." onkeyup="handleKeyUp(event)">
+                <button onclick="searchVideos()">Search</button>
+            </div>
+        </div>
+
+        <div class="results-grid">
+            <div class="panel">
+                <h3>Search Results</h3>
+                <div id="videoList" class="video-list">
+                    <div class="no-data">Enter a participant name to search</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Video Details</h3>
+                <div id="videoDetails">
+                    <div class="no-data">Select a video to view details</div>
+                </div>
+
+                <div class="calibration-section">
+                    <h3>Calibration Info</h3>
+                    <div id="calibrationInfo">
+                        <div class="no-data">Select a video to view calibration</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedVideo = null;
+
+        function handleKeyUp(event) {
+            if (event.key === 'Enter') {
+                searchVideos();
+            }
+        }
+
+        async function searchVideos() {
+            const query = document.getElementById('searchInput').value.trim();
+            const listDiv = document.getElementById('videoList');
+            
+            if (!query) {
+                listDiv.innerHTML = '<div class="no-data">Enter a participant name to search</div>';
+                return;
+            }
+
+            listDiv.innerHTML = '<div class="loading">Searching...</div>';
+
+            try {
+                const response = await fetch(`/api/search_videos/?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.videos && data.videos.length > 0) {
+                    listDiv.innerHTML = data.videos.map(video => `
+                        <div class="video-item" onclick="selectVideo(${video.id})" id="video-${video.id}">
+                            <div class="name">${escapeHtml(video.participant_name)}</div>
+                            <div class="meta">
+                                <strong>Type:</strong> ${escapeHtml(video.pet_type)} | 
+                                <strong>Test:</strong> ${escapeHtml(video.test_id)} | 
+                                <strong>Assessment:</strong> ${escapeHtml(video.assessment_id)}
+                            </div>
+                            <div class="meta">
+                                <strong>Duration:</strong> ${video.duration}s | 
+                                <strong>Distance:</strong> ${video.distance}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    listDiv.innerHTML = '<div class="no-data">No videos found</div>';
+                }
+            } catch (error) {
+                listDiv.innerHTML = '<div class="no-data">Error searching videos</div>';
+                console.error(error);
+            }
+        }
+
+        async function selectVideo(videoId) {
+            // Update selection UI
+            document.querySelectorAll('.video-item').forEach(el => el.classList.remove('selected'));
+            document.getElementById(`video-${videoId}`).classList.add('selected');
+
+            const detailsDiv = document.getElementById('videoDetails');
+            const calibDiv = document.getElementById('calibrationInfo');
+
+            detailsDiv.innerHTML = '<div class="loading">Loading...</div>';
+            calibDiv.innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                const response = await fetch(`/api/video_detail/${videoId}/`);
+                const data = await response.json();
+
+                if (data.video) {
+                    const v = data.video;
+                    selectedVideo = v;
+                    
+                    detailsDiv.innerHTML = `
+                        <div class="detail-section">
+                            <div class="detail-row">
+                                <span class="detail-label">ID:</span>
+                                <span class="detail-value">${v.id}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value">${escapeHtml(v.name)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Participant:</span>
+                                <span class="detail-value">${escapeHtml(v.participant_name)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Participant ID:</span>
+                                <span class="detail-value">${escapeHtml(v.participant_id)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Assessment ID:</span>
+                                <span class="detail-value">${escapeHtml(v.assessment_id)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Test ID:</span>
+                                <span class="detail-value">${escapeHtml(v.test_id)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Type:</span>
+                                <span class="detail-value">${escapeHtml(v.pet_type)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Type Param:</span>
+                                <span class="detail-value">${escapeHtml(v.type_param || 'N/A')}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Duration:</span>
+                                <span class="detail-value">${v.duration} seconds</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Distance:</span>
+                                <span class="detail-value">${v.distance}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Processed:</span>
+                                <span class="detail-value">${v.is_video_processed ? 'Yes' : 'No'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Progress:</span>
+                                <span class="detail-value">${v.progress}%</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Video Link:</span>
+                                <span class="detail-value">
+                                    ${v.file_url ? `<a href="${v.file_url}" target="_blank">View Original</a>` : 'N/A'}
+                                </span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Processed Video:</span>
+                                <span class="detail-value">
+                                    ${v.processed_file_url ? `<a href="${v.processed_file_url}" target="_blank">View Processed</a>` : 'N/A'}
+                                </span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Uploaded:</span>
+                                <span class="detail-value">${v.uploaded_at}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    // Load calibration info
+                    loadCalibration(v.assessment_id, v.test_id);
+                } else {
+                    detailsDiv.innerHTML = '<div class="no-data">Video not found</div>';
+                }
+            } catch (error) {
+                detailsDiv.innerHTML = '<div class="no-data">Error loading video details</div>';
+                console.error(error);
+            }
+        }
+
+        async function loadCalibration(assessmentId, testId) {
+            const calibDiv = document.getElementById('calibrationInfo');
+
+            try {
+                const response = await fetch(`/api/calibration_info/?assessment_id=${encodeURIComponent(assessmentId)}&test_id=${encodeURIComponent(testId)}`);
+                const data = await response.json();
+
+                if (data.calibration) {
+                    const c = data.calibration;
+                    calibDiv.innerHTML = `
+                        <div class="detail-section">
+                            <div class="detail-row">
+                                <span class="detail-label">Assessment ID:</span>
+                                <span class="detail-value">${escapeHtml(c.assessment_id)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Test ID:</span>
+                                <span class="detail-value">${escapeHtml(c.test_id)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Start Pixel:</span>
+                                <span class="detail-value">${c.start_pixel}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">End Pixel:</span>
+                                <span class="detail-value">${c.end_pixel}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Unit Distance:</span>
+                                <span class="detail-value">${c.unit_distance}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Use Homograph:</span>
+                                <span class="detail-value">${c.use_homograph ? 'Yes' : 'No'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Origin:</span>
+                                <span class="detail-value">(${c.origin_x}, ${c.origin_y})</span>
+                            </div>
+                            ${c.homography_points ? `
+                            <div class="detail-row">
+                                <span class="detail-label">Homography Points:</span>
+                                <span class="detail-value"><pre style="margin:0;font-size:12px;">${JSON.stringify(c.homography_points, null, 2)}</pre></span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ${c.frame_url ? `
+                            <h4 style="margin-top:15px;color:var(--accent);">Calibration Frame</h4>
+                            <img src="${c.frame_url}" alt="Calibration Frame" class="calibration-image">
+                        ` : '<div class="no-data">No calibration image available</div>'}
+                    `;
+                } else {
+                    calibDiv.innerHTML = '<div class="no-data">No calibration data found for this assessment/test</div>';
+                }
+            } catch (error) {
+                calibDiv.innerHTML = '<div class="no-data">Error loading calibration info</div>';
+                console.error(error);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

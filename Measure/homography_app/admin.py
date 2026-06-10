@@ -15,6 +15,19 @@ class PetVideosAdmin(admin.ModelAdmin):
         "duration",
         "process_button",
     )
+    
+    # Add search fields
+    search_fields = (
+        "name",
+        "participant_name",
+    )
+    
+    # Add filters
+    list_filter = (
+        "pet_type",
+        "is_video_processed",
+        "uploaded_at",
+    )
 
     def get_urls(self):
         urls = super().get_urls()
@@ -53,6 +66,7 @@ class CalibrationDataModelAdmin(admin.ModelAdmin):
         "origin_x",
         "origin_y",
         "unit_distance",
+        "use_homograph",
     )
 admin.site.register(PetVideos, PetVideosAdmin)
 admin.site.register(SingletonHomographicMatrixModel)

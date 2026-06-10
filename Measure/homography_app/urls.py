@@ -14,5 +14,11 @@ urlpatterns = [
             #path('process_image/', views.process_image, name='process_image'),
     path('list_videos_by_assessment_and_test/', views.list_videos_by_assessment_and_test,
          name='list_videos_by_assessment_and_test'),
+    
+    # Search videos page
+    path('search/', views.search_videos_page, name='search_videos'),
+    path('api/search_videos/', views.api_search_videos, name='api_search_videos'),
+    path('api/video_detail/<int:video_id>/', views.api_video_detail, name='api_video_detail'),
+    path('api/calibration_info/', views.api_calibration_info, name='api_calibration_info'),
 ]
 

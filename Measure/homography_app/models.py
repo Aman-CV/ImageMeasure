@@ -97,7 +97,7 @@ class PetVideos(models.Model):
                 assessment_id=self.assessment_id,
                 unique_id=unique_id,
             )
-        elif self.type_param.lower() in ("endurance", "sprint speed", "agility", "0"):
+        elif self.type_param.lower() in ("endurance", "sprint speed", "speed", "agility", "0"):
             return celery_process_15m_dash.delay(self.id, test_id=self.test_id, assessment_id=self.assessment_id, unique_id=unique_id)
 
         elif self.type_param.lower() in ("core strength",):

@@ -128,7 +128,7 @@ def _dispatch_processing_task(test_type, video_id, test_id, assessment_id, enabl
         celery_process_sit_and_throw.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
     elif test_type == 'flexibility' or test_type == 'reach':
         celery_process_sit_and_reach.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
-    elif test_type in ('endurance', 'sprint speed', 'agility'):
+    elif test_type in ('endurance', 'sprint speed', 'speed', 'agility'):
         celery_process_15m_dash.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
     elif test_type == 'core strength':
         celery_process_plank.delay(video_id, test_id=test_id, assessment_id=assessment_id, unique_id=unique_id)
@@ -513,7 +513,7 @@ def upload_calibration_video(request):
         return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
 
     #simple_test_ids = {'Vnb7E6L6', 'VpKl80KM', 'BwbJyXKl', 'G6bWk0bW', 'vPbXoPK4', 'lzb1PEKm'}
-    simple_test_type = {"upper body strength", "lower body strength", "sprint speed", "agility", "flexibility", "endurance"}
+    simple_test_type = {"upper body strength", "lower body strength", "sprint speed", "speed", "agility", "flexibility", "endurance"}
     if not payload['use_sam_homograph'] and payload['type_param'] in simple_test_type:
         return _run_simple_calibration(frame, payload)
 
@@ -881,4 +881,104 @@ def get_video_link(request):
 #         'status' : 'success',
 #         'calibration_info': response_data
 #     })
+
+
+# ============== Search Videos Page ==============
+
+def search_videos_page(request):
+    """Render the search videos page."""
+    return render(request, 'search_videos.html')
+
+
+def api_search_videos(request):
+    """API to search videos by participant name."""
+    query = request.GET.get('q', '').strip()
+    
+    if not query:
+        return JsonResponse({'videos': []})
+    
+    videos = PetVideos.objects.filter(
+        participant_name__icontains=query
+    ).order_by('-uploaded_at')[:50]
+    
+    data = [{
+        'id': v.id,
+        'name': v.name,
+        'participant_name': v.participant_name,
+        'participant_id': v.participant_id,
+        'pet_type': v.pet_type,
+        'test_id': v.test_id,
+        'assessment_id': v.assessment_id,
+        'duration': v.duration,
+        'distance': v.distance,
+        'is_video_processed': v.is_video_processed,
+        'progress': v.progress,
+    } for v in videos]
+    
+    return JsonResponse({'videos': data})
+
+
+def api_video_detail(request, video_id):
+    """API to get full video details."""
+    try:
+        v = PetVideos.objects.get(id=video_id)
+        
+        data = {
+            'id': v.id,
+            'name': v.name,
+            'participant_name': v.participant_name,
+            'participant_id': v.participant_id,
+            'pet_type': v.pet_type,
+            'test_id': v.test_id,
+            'assessment_id': v.assessment_id,
+            'type_param': v.type_param,
+            'duration': v.duration,
+            'distance': v.distance,
+            'is_video_processed': v.is_video_processed,
+            'progress': v.progress,
+            'take_best': v.take_best,
+            'to_be_processed': v.to_be_processed,
+            'uploaded_at': v.uploaded_at.strftime('%Y-%m-%d %H:%M:%S') if v.uploaded_at else None,
+            'file_url': v.file.url if v.file else None,
+            'processed_file_url': v.processed_file.url if v.processed_file else None,
+        }
+        
+        return JsonResponse({'video': data})
+    
+    except PetVideos.DoesNotExist:
+        return JsonResponse({'error': 'Video not found'}, status=404)
+
+
+def api_calibration_info(request):
+    """API to get calibration info by assessment_id and test_id."""
+    assessment_id = request.GET.get('assessment_id', '')
+    test_id = request.GET.get('test_id', '')
+    
+    try:
+        calib = CalibrationDataModel.objects.filter(
+            assessment_id=assessment_id,
+            test_id=test_id
+        ).first()
+        
+        if not calib:
+            return JsonResponse({'calibration': None})
+        
+        data = {
+            'id': calib.id,
+            'assessment_id': calib.assessment_id,
+            'test_id': calib.test_id,
+            'start_pixel': calib.start_pixel,
+            'end_pixel': calib.end_pixel,
+            'unit_distance': calib.unit_distance,
+            'use_homograph': calib.use_homograph,
+            'homography_points': calib.homography_points,
+            'origin_x': calib.origin_x,
+            'origin_y': calib.origin_y,
+            'frame_url': calib.frame.url if calib.frame else None,
+        }
+        
+        return JsonResponse({'calibration': data})
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
