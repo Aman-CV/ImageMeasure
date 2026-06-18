@@ -77,8 +77,8 @@ def _active_task_count():
 
 
 def _check_or_retry(task):
-    """If >= 3 concurrent tasks are running AND < 2 GB free, reschedule."""
-    if _active_task_count() >= _CONCURRENT_THRESHOLD and not check_memory_available(min_gb=2.0):
+    """If >= 3 concurrent tasks are running AND < 1.4 GB free, reschedule."""
+    if _active_task_count() >= _CONCURRENT_THRESHOLD and not check_memory_available(min_gb=1.4):
         avail_gb = psutil.virtual_memory().available / 1024 ** 3
         logger.warning(
             'Task %s: only %.1f GB free with >=3 active tasks, rescheduling in %ds (attempt %d/%d)',
