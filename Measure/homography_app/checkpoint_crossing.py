@@ -316,10 +316,11 @@ def detect_crossing_person_box_reverse_nobuffer(
     use_reversed = tmp_reversed is not None
     cap = cv2.VideoCapture(tmp_reversed if use_reversed else video_path)
 
-    model = YOLO("yolov8x.pt")
+    model = YOLO("yolov8l.pt")
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    half_frames = total_frames // 2
 
     target_id = None
     prev_x = None
@@ -391,6 +392,9 @@ def detect_crossing_person_box_reverse_nobuffer(
                 if result[0] is not None:
                     break
 
+                if cfno >= half_frames:
+                    break
+
                 if show:
                     cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
                     cv2.imshow("Reverse Processing", frame)
@@ -401,7 +405,7 @@ def detect_crossing_person_box_reverse_nobuffer(
                 result = (int(total_frames - 1), (total_frames - 1) / fps, output_image_path)
         else:
             # Fallback: original backward-seeking approach
-            for idx in range(total_frames - 1, -1, -1):
+            for idx in range(total_frames - 1, total_frames - 1 - half_frames, -1):
                 cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
                 ret, frame = cap.read()
                 if not ret:

@@ -188,7 +188,7 @@ def download_and_save_video(obj, unique_id=""):
         timeout=120, 
     )
     _remove_files(raw_path)
-    print("Deleted raw upload:", raw_path)
+    #print("Deleted raw upload:", raw_path)
     return final_path
 
 
