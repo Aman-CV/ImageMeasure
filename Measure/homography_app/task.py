@@ -794,10 +794,13 @@ def process_ttest_6x15_dash(petvideo_id, test_id, assessment_id, unique_id=""):
         is_changed = False
         if duration < 0.5:
             logger.info(f"6x15_dash: running crossing detector for video {petvideo_id}")
-            fpx = [homograph_obj.origin_x, homograph_obj.origin_y]
-            if homograph_obj.origin_x == 0 and homograph_obj == 0:
-                fpx = [homograph_obj.end_pixel, None]
-            fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, fpx, show=False, video_obj=video_obj)
+            p1 = homograph_obj.homography_points.get("p1", {})
+            p1_x = p1.get("fx", 0) * 1280 if p1.get("fx") else homograph_obj.origin_x
+            p1_y = p1.get("fy", 0) * 720 if p1.get("fy") else 0
+            line_points = [(homograph_obj.origin_x, homograph_obj.origin_y), (p1_x, p1_y)]
+            if homograph_obj.origin_x == 0 and homograph_obj.origin_y == 0:
+                line_points = [(homograph_obj.end_pixel, 0), (homograph_obj.end_pixel, 720)]
+            fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, line_points, show=False, video_obj=video_obj)
             print(fno, "Stop frame")
             if duration and duration > 1:
                 #video_obj.duration = duration - 3.5

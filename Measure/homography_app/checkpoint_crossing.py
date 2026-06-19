@@ -290,9 +290,21 @@ def detect_crossing_person_box(
     return None, None, None
 
 
+def _side_of_line(px, py, ax, ay, bx, by):
+    """Signed value: positive on one side, negative on the other."""
+    return (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+
+
+def _dist_to_line(px, py, ax, ay, bx, by):
+    """Perpendicular distance from point to line AB."""
+    num = abs((bx - ax) * (ay - py) - (ax - px) * (by - ay))
+    den = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
+    return num / den if den > 0 else abs(px - ax)
+
+
 def detect_crossing_person_box_reverse_nobuffer(
     video_path,
-    x_BA,
+    line_points,
     output_image_path="motion_output.jpg",
     resize_width=1280,
     resize_height=720,
@@ -323,9 +335,11 @@ def detect_crossing_person_box_reverse_nobuffer(
     half_frames = total_frames // 2
 
     target_id = None
-    prev_x = None
+    prev_side = None
     cfno = 0
-    x_B, y_pos = x_BA
+    (ax, ay), (bx, by) = line_points
+    mid_x = (ax + bx) / 2
+    mid_y = (ay + by) / 2
     result = (None, None, None)
 
     try:
@@ -361,11 +375,11 @@ def detect_crossing_person_box_reverse_nobuffer(
                     for box, track_id in zip(boxes, ids):
                         x1, y1, x2, y2 = box
                         x_pos = x1 + 0.5 * (x2 - x1)
-                        dist = abs(x_pos - x_B)
+                        dist = abs(x_pos - mid_x)
                         if dist <= x_tresh and y2 > max_y2 and y2 > y_tresh:
                             max_y2 = y2
                             target_id = track_id
-                            prev_x = x_pos
+                            prev_side = _side_of_line(x_pos, y2, ax, ay, bx, by)
                     if target_id is None:
                         continue
 
@@ -373,21 +387,22 @@ def detect_crossing_person_box_reverse_nobuffer(
                     if track_id != target_id:
                         continue
                     x1, y1, x2, y2 = box
-                    towards_x1 = 0.9 if abs(x_B - x1) < abs(x_B - x2) else 0.1
+                    towards_x1 = 0.9 if abs(mid_x - x1) < abs(mid_x - x2) else 0.1
                     x_pos = x1 + (towards_x1) * (x2 - x1)
                     y_pos = y2
 
+                    cur_side = _side_of_line(x_pos, y_pos, ax, ay, bx, by)
                     cv2.circle(frame, (int(x1), int(y_pos)), 6, (0, 0, 255), -1)
                     cv2.circle(frame, (int(x2), int(y_pos)), 6, (255, 0, 0), -1)
                     cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
-                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-                    if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 8:
+                    cv2.line(frame, (int(ax), int(ay)), (int(bx), int(by)), (0, 0, 255), 2)
+                    if prev_side is not None and (prev_side * cur_side < 0 or _dist_to_line(x_pos, y_pos, ax, ay, bx, by) < 8):
                         cv2.imwrite(output_image_path, frame)
-                        frame_number = frame_number - 1
+                        frame_number = frame_number
                         current_time = frame_number / fps
                         result = (frame_number, current_time, output_image_path)
                         break
-                    prev_x = x_pos
+                    prev_side = cur_side
 
                 if result[0] is not None:
                     break
@@ -396,7 +411,7 @@ def detect_crossing_person_box_reverse_nobuffer(
                     break
 
                 if show:
-                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+                    cv2.line(frame, (int(ax), int(ay)), (int(bx), int(by)), (0, 0, 255), 2)
                     cv2.imshow("Reverse Processing", frame)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
@@ -442,12 +457,12 @@ def detect_crossing_person_box_reverse_nobuffer(
                         x1, y1, x2, y2 = box
 
                         x_pos = x1 + 0.5 * (x2 - x1)
-                        dist = abs(x_pos - x_B)
+                        dist = abs(x_pos - mid_x)
 
                         if dist <= x_tresh and y2 > max_y2 and y2 > y_tresh:
                             max_y2 = y2
                             target_id = track_id
-                            prev_x = x_pos
+                            prev_side = _side_of_line(x_pos, y2, ax, ay, bx, by)
 
                     if target_id is None:
                         continue
@@ -457,29 +472,30 @@ def detect_crossing_person_box_reverse_nobuffer(
                         continue
 
                     x1, y1, x2, y2 = box
-                    towards_x1 = 0.9 if abs(x_B - x1) < abs(x_B - x2) else 0.1
+                    towards_x1 = 0.9 if abs(mid_x - x1) < abs(mid_x - x2) else 0.1
                     x_pos = x1 + (towards_x1) * (x2 - x1)
                     y_pos = y2
 
+                    cur_side = _side_of_line(x_pos, y_pos, ax, ay, bx, by)
                     # visualization
                     cv2.circle(frame, (int(x1), int(y_pos)), 6, (0, 0, 255), -1)
                     cv2.circle(frame, (int(x2), int(y_pos)), 6, (255, 0, 0), -1)
                     cv2.circle(frame, (int(x_pos), int(y_pos)), 6, (0, 255, 0), -1)
-                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
-                    if prev_x is not None and (prev_x - x_B) * (x_pos - x_B) < 0 or abs(x_B - x_pos) < 8:
+                    cv2.line(frame, (int(ax), int(ay)), (int(bx), int(by)), (0, 0, 255), 2)
+                    if prev_side is not None and (prev_side * cur_side < 0 or _dist_to_line(x_pos, y_pos, ax, ay, bx, by) < 8):
                         cv2.imwrite(output_image_path, frame)
-                        frame_number = frame_number - 1
+                        frame_number = frame_number
                         current_time = frame_number / fps
                         result = (frame_number, current_time, output_image_path)
                         break
 
-                    prev_x = x_pos
+                    prev_side = cur_side
 
                 if result[0] is not None:
                     break
 
                 if show:
-                    cv2.line(frame, (int(x_B), 0), (int(x_B), resize_height), (0, 0, 255), 2)
+                    cv2.line(frame, (int(ax), int(ay)), (int(bx), int(by)), (0, 0, 255), 2)
                     cv2.imshow("Reverse Processing", frame)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
@@ -546,9 +562,26 @@ def write_video_until_frame(
 
 
 if __name__ == "__main__":
-    video_path = "this.mp4"
+    import sys
+    import tempfile
+    import urllib.request
 
-    fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, [500, 360], show=True,
-                                                                   video_obj=None)
+    source = sys.argv[1] if len(sys.argv) > 1 else "this.mp4"
 
-    print(f"Crossing frame: {fno}, duration: {duration - 3.5:.2f} seconds")
+    tmp_dl = None
+    if source.startswith("http://") or source.startswith("https://"):
+        tmp_fd, tmp_dl = tempfile.mkstemp(suffix=".mp4")
+        os.close(tmp_fd)
+        print(f"Downloading {source} ...")
+        urllib.request.urlretrieve(source, tmp_dl)
+        video_path = tmp_dl
+    else:
+        video_path = source
+
+    try:
+        fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, [(160, 469), (243, 503)], show=True,
+                                                                       video_obj=None)
+        print(f"Crossing frame: {fno}, duration: {duration - 3.5:.2f} seconds")
+    finally:
+        if tmp_dl and os.path.exists(tmp_dl):
+            os.remove(tmp_dl)
