@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'homography_app',
+    'skill_assessment',
     'background_task',
     'storages',
     'django_celery_results',
