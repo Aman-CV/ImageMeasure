@@ -311,7 +311,10 @@ def detect_crossing_person_box_reverse_nobuffer(
     conf=0.2,
     show=False,
     video_obj=None,
+    frame_skip=2,
 ):
+    # frame_skip=2 -> run YOLO on every other frame (2x faster). Set to 1 to process all frames.
+    frame_skip = max(1, int(frame_skip))
     # Reverse video to a temp file so we can read forward (fast sequential I/O)
     tmp_fd, tmp_reversed = tempfile.mkstemp(suffix=".mp4")
     os.close(tmp_fd)
@@ -353,6 +356,13 @@ def detect_crossing_person_box_reverse_nobuffer(
                 if video_obj and int(cfno / total_frames * 100) % 10 == 0:
                     video_obj.progress = int(cfno / total_frames * 100)
                     video_obj.save(update_fields=["progress"])
+
+                # Skip YOLO inference on alternate frames for speed
+                if frame_skip > 1 and (cfno % frame_skip) != 0:
+                    if cfno >= half_frames:
+                        break
+                    continue
+
                 frame = cv2.resize(frame, (resize_width, resize_height))
                 # Map forward index back to original frame number
                 idx = total_frames - cfno
@@ -419,8 +429,8 @@ def detect_crossing_person_box_reverse_nobuffer(
             if result[0] is None:
                 result = (int(total_frames - 1), (total_frames - 1) / fps, output_image_path)
         else:
-            # Fallback: original backward-seeking approach
-            for idx in range(total_frames - 1, total_frames - 1 - half_frames, -1):
+            # Fallback: original backward-seeking approach (step by frame_skip = alternate frames)
+            for idx in range(total_frames - 1, total_frames - 1 - half_frames, -frame_skip):
                 cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
                 ret, frame = cap.read()
                 if not ret:
@@ -566,7 +576,7 @@ if __name__ == "__main__":
     import tempfile
     import urllib.request
 
-    source = sys.argv[1] if len(sys.argv) > 1 else "this.mp4"
+    source = "https://d19vjxyttg06q6.cloudfront.net/media/videos/b1815fec-1117-455c-8882-ea06abcd8a4d.mp4"
 
     tmp_dl = None
     if source.startswith("http://") or source.startswith("https://"):
@@ -579,7 +589,7 @@ if __name__ == "__main__":
         video_path = source
 
     try:
-        fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, [(160, 469), (243, 503)], show=True,
+        fno, duration, _ = detect_crossing_person_box_reverse_nobuffer(video_path, [(1004, 486), (int(1280 * 0.689), int(720 * 0.729))], show=True,
                                                                        video_obj=None)
         print(f"Crossing frame: {fno}, duration: {duration - 3.5:.2f} seconds")
     finally:
