@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pet Videos - ImageMeasure</title>
+  <style>
+    :root {
+      --bg-1: #f8efe2;
+      --bg-2: #d7efe4;
+      --bg-3: #f6cfb8;
+      --ink: #1e2a2f;
+      --card: #ffffff;
+      --accent: #0f766e;
+      --accent-2: #0a5a54;
+      --shadow: rgba(15, 118, 110, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 15%, var(--bg-3), transparent 35%),
+        radial-gradient(circle at 80% 85%, #c6e5ff, transparent 30%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: color-mix(in srgb, var(--card) 90%, transparent);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 22px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(6px);
+      padding: 40px;
+      animation: fadeInUp 500ms ease-out both;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+      letter-spacing: 0.02em;
+      font-weight: 700;
+    }
+
+    .back-btn {
+      display: inline-block;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(15, 118, 110, 0.1);
+      border: 1px solid var(--accent);
+      transition: all 180ms ease;
+    }
+      
+    .back-btn:hover {
+      background: var(--accent);
+      color: white;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: rgba(15, 118, 110, 0.05);
+      border: 1px solid rgba(15, 118, 110, 0.15);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--ink);
+      opacity: 0.8;
+      margin-top: 6px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    thead {
+      background: linear-gradient(120deg, var(--accent), #14998f);
+      color: white;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+    }
+
+    th {
+      padding: 16px 18px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(15, 118, 110, 0.08);
+    }
+
+    tbody tr {
+      transition: background 150ms ease;
+    }
+
+    tbody tr.video-row {
+      cursor: pointer;
+    }
+
+    tbody tr:hover {
+      background: rgba(15, 118, 110, 0.06);
+    }
+
+    /* Video modal */
+    .video-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .video-modal-content {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 900px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .video-modal-header {
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      font-weight: 600;
+      font-size: 1.05rem;
+      z-index: 1;
+    }
+
+    .video-modal-close {
+      background: none;
+      border: none;
+      font-size: 1.8rem;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--ink);
+      opacity: 0.6;
+      transition: opacity 150ms ease;
+    }
+
+    .video-modal-close:hover {
+      opacity: 1;
+    }
+
+    .video-source-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .badge-processed {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+
+    .badge-original {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+    }
+
+    #videoModalPlayer {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+      display: block;
+      max-height: 70vh;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 24px;
+      background: rgba(15, 118, 110, 0.1);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #14998f);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: white;
+      transition: width 300ms ease;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .status-processed {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .status-processing {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      border: 1px solid var(--warning);
+    }
+
+    .test-type-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent);
+      border: 1px solid rgba(15, 118, 110, 0.2);
+    }
+
+    .queue-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: white;
+      background: linear-gradient(120deg, var(--accent), #14998f);
+      cursor: pointer;
+      transition: all 180ms ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 8px rgba(15, 118, 110, 0.2);
+    }
+
+    .queue-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+    }
+
+    .queue-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .queue-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .loading-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 600ms linear infinite;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .calib-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(15, 118, 110, 0.08);
+      cursor: pointer;
+      transition: all 180ms ease;
+    }
+
+    .calib-btn:hover {
+      background: var(--accent);
+      color: white;
+    }
+
+    .calib-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .calib-table td {
+      padding: 5px 10px;
+      border-bottom: 1px solid rgba(15, 118, 110, 0.1);
+    }
+
+    .calib-table td:first-child {
+      font-weight: 600;
+      color: var(--accent);
+      width: 40%;
+    }
+
+    .calib-not-found {
+      text-align: center;
+      padding: 24px 20px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--warning);
+    }
+
+    .calib-frame {
+      width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      border-radius: 10px;
+      margin-top: 12px;
+      display: block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--ink);
+      opacity: 0.6;
+    }
+
+    .empty-state h2 {
+      margin: 0 0 12px;
+      font-size: 1.5rem;
+    }
+
+    .empty-state p {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+      }
+
+      header {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      th, td {
+        padding: 12px 10px;
+        font-size: 0.9rem;
+      }
+
+      .status-badge {
+        min-width: 80px;
+        padding: 4px 8px;
+        font-size: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Pet Videos</h1>
+      <a href="/" class="back-btn">← Back to Home</a>
+    </header>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value">{{ videos|length }}</div>
+        <div class="stat-label">Total Videos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ processed_count }}</div>
+        <div class="stat-label">Processed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ processing_count }}</div>
+        <div class="stat-label">Processing</div>
+      </div>
+    </div>
+
+    {% if videos %}
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Test Name</th>
+              <th>Test Type</th>
+              <th>Progress</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for video in videos %}
+              <tr class="video-row"
+                  data-video-url="{% if video.is_video_processed and video.processed_file %}{{ video.processed_file.url }}{% elif video.file %}{{ video.file.url }}{% endif %}"
+                  data-video-title="{{ video.participant_name }} — {{ video.test_id }}"
+                  data-is-processed="{{ video.is_video_processed|yesno:'1,0' }}"
+                  data-assessment-id="{{ video.assessment_id }}"
+                  data-test-id="{{ video.test_id }}"
+                  onclick="openVideo(this)">
+                <td>{{ video.id }}</td>
+                <td>{{ video.participant_name }}</td>
+                <td>{{ video.test_id }}</td>
+                <td><span class="test-type-badge">{{ video.type_param|title }}</span></td>
+                <td>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar" style="width: {{ video.progress }}%;">
+                      {% if video.progress > 0 %}
+                        {{ video.progress }}%
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  {% if video.is_video_processed %}
+                    <span class="status-badge status-processed">✓ Processed</span>
+                  {% else %}
+                    <span class="status-badge status-processing">⟳ Processing</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <button class="queue-btn" data-video-id="{{ video.id }}" onclick="event.stopPropagation(); queueProcessing({{ video.id }}, this)">
+                      <span class="queue-text">Queue</span>
+                      <span class="loading-spinner" style="display: none;"></span>
+                    </button>
+                    <button class="calib-btn" onclick="event.stopPropagation(); showCalibration(this.closest('tr'))">Calib</button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <h2>No Videos Found</h2>
+        <p>There are no pet videos to display yet.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div id="videoModal" class="video-modal" onclick="closeVideo(event)">
+    <div class="video-modal-content" onclick="event.stopPropagation()">
+      <div class="video-modal-header">
+        <span id="videoModalTitle"></span>
+        <button class="video-modal-close" onclick="closeVideo(event)">&times;</button>
+      </div>
+      <span id="videoModalBadge" class="video-source-badge"></span>
+      <video id="videoModalPlayer" controls autoplay playsinline></video>
+    </div>
+  </div>
+
+  <div id="calibModal" class="video-modal" onclick="closeCalibration(event)">
+    <div class="video-modal-content" onclick="event.stopPropagation()">
+      <div class="video-modal-header">
+        <span id="calibModalTitle">Calibration Info</span>
+        <button class="video-modal-close" onclick="closeCalibration(event)">&times;</button>
+      </div>
+      <div id="calibModalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    function openVideo(row) {
+      const url = row.getAttribute('data-video-url');
+      if (!url) {
+        alert('No video file available for this entry.');
+        return;
+      }
+      const player = document.getElementById('videoModalPlayer');
+      const badge = document.getElementById('videoModalBadge');
+      const isProcessed = row.getAttribute('data-is-processed') === '1';
+
+      document.getElementById('videoModalTitle').textContent = row.getAttribute('data-video-title');
+      badge.textContent = isProcessed ? 'Processed video' : 'Original video (not processed yet)';
+      badge.className = 'video-source-badge ' + (isProcessed ? 'badge-processed' : 'badge-original');
+      player.src = url;
+      document.getElementById('videoModal').style.display = 'flex';
+    }
+
+    function closeVideo(event) {
+      if (event) event.stopPropagation();
+      const player = document.getElementById('videoModalPlayer');
+      player.pause();
+      player.src = '';
+      document.getElementById('videoModal').style.display = 'none';
+    }
+
+    function showCalibration(row) {
+      const assessmentId = row.getAttribute('data-assessment-id');
+      const testId = row.getAttribute('data-test-id');
+      const modal = document.getElementById('calibModal');
+      const body = document.getElementById('calibModalBody');
+      const title = document.getElementById('calibModalTitle');
+
+      title.textContent = `Calibration — ${testId} / ${assessmentId}`;
+      body.innerHTML = '<div class="calib-not-found" style="color:var(--accent)">Loading…</div>';
+      modal.style.display = 'flex';
+
+      const url = `/api/calibration_info/?assessment_id=${encodeURIComponent(assessmentId)}&test_id=${encodeURIComponent(testId)}`;
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          const c = data.calibration;
+          if (!c) {
+            body.innerHTML = '<div class="calib-not-found">⚠ Not calibrated</div>';
+            return;
+          }
+          const rows = [
+            ['ID', c.id],
+            ['Assessment ID', c.assessment_id],
+            ['Test ID', c.test_id],
+            ['Start Pixel', c.start_pixel],
+            ['End Pixel', c.end_pixel],
+            ['Unit Distance', c.unit_distance],
+            ['Use Homograph', c.use_homograph ? 'Yes' : 'No'],
+            ['Origin X', c.origin_x],
+            ['Origin Y', c.origin_y],
+            ['Homography Points', `<pre style="margin:0;white-space:pre-wrap;font-size:0.8rem">${JSON.stringify(c.homography_points, null, 2)}</pre>`],
+          ];
+          let html = '<table class="calib-table"><tbody>';
+          rows.forEach(([k, v]) => {
+            html += `<tr><td>${k}</td><td>${v ?? '—'}</td></tr>`;
+          });
+          html += '</tbody></table>';
+          if (c.frame_url) {
+            html += `<img class="calib-frame" src="${c.frame_url}" alt="Calibration frame">`;
+          }
+          body.innerHTML = html;
+        })
+        .catch(err => {
+          body.innerHTML = `<div class="calib-not-found">Failed to load: ${err}</div>`;
+        });
+    }
+
+    function closeCalibration(event) {
+      if (event) event.stopPropagation();
+      document.getElementById('calibModal').style.display = 'none';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { closeVideo(); closeCalibration(); }
+    });
+
+    function queueProcessing(videoId, button) {
+      const formData = new FormData();
+      formData.append('video_id', videoId);
+
+      const queueText = button.querySelector('.queue-text');
+      const spinner = button.querySelector('.loading-spinner');
+
+      button.disabled = true;
+      queueText.style.display = 'none';
+      spinner.style.display = 'block';
+
+      fetch('/api/queue_processing/', {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'success') {
+            button.textContent = '✓ Queued';
+            button.style.background = 'linear-gradient(120deg, var(--success), #059669)';
+            setTimeout(() => {
+              location.reload();
+            }, 1500);
+          } else {
+            alert('Error: ' + data.message);
+            button.disabled = false;
+            queueText.style.display = 'block';
+            spinner.style.display = 'none';
+          }
+        })
+        .catch(err => {
+          console.error('Queue processing failed:', err);
+          alert('Failed to queue video: ' + err);
+          button.disabled = false;
+          queueText.style.display = 'block';
+          spinner.style.display = 'none';
+        });
+    }
+
+    // Auto-refresh table every 5 seconds to update progress
+    setInterval(() => {
+      fetch(window.location.pathname)
+        .then(response => response.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const newDoc = parser.parseFromString(html, 'text/html');
+
+          const newTable = newDoc.querySelector('table');
+          const oldTable = document.querySelector('table');
+          if (newTable && oldTable) {
+            oldTable.parentElement.replaceChild(newTable, oldTable);
+          }
+
+          const newStats = newDoc.querySelector('.stats');
+          const oldStats = document.querySelector('.stats');
+          if (newStats && oldStats) {
+            oldStats.parentElement.replaceChild(newStats, oldStats);
+          }
+        })
+        .catch(err => console.error('Auto-refresh failed:', err));
+    }, 5000);
+  </script>
+</body>
+</html>

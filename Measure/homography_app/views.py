@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import subprocess
 from botocore.exceptions import ClientError
@@ -25,6 +26,11 @@ from .celery_tasks import (
 )
 from django.conf import settings
 import base64
+
+logger = logging.getLogger(__name__)
+
+# Videos with an id above this threshold are eligible for the bulk "unprocessed" workflow.
+UNPROCESSED_MIN_ID = 1000
 
 DEFAULT_HOMOGRAPH_POINTS = {
                 "p1": {"fx": None, "fy": None},
@@ -247,26 +253,28 @@ def _extract_middle_frame(video_file, test_id):
             for chunk in video_file.chunks():
                 temp.write(chunk)
             temp.flush()
-            os.fsync(temp.fileno())
             temp_path = temp.name
+        # File handle is closed on exit of the `with` block, so the temp file is
+        # flushed and unlocked by the time we open it below — no fsync/sleep needed.
 
-        time.sleep(0.2)
         for _ in range(3):
             cap = cv2.VideoCapture(temp_path)
             if cap.isOpened():
                 break
-            time.sleep(0.2)
+            time.sleep(0.1)
 
         if not cap or not cap.isOpened():
             raise ValueError(f'Could not open uploaded video (path: {temp_path})')
 
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total_frames == 0:
-            raise ValueError('Video appears empty or unreadable')
-
-        middle_frame_index = total_frames // 2
-        cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
-        ret, frame = cap.read()
+        # The calibration board is static across the clip, so any frame works.
+        # Read the first readable frame instead of seeking to the middle:
+        # cv2.CAP_PROP_POS_FRAMES seeks are not keyframe-accurate on long-GOP
+        # video and force decoding hundreds of frames (seconds). Frame 0 is O(1).
+        ret, frame = False, None
+        for _ in range(5):
+            ret, frame = cap.read()
+            if ret and frame is not None:
+                break
         # if test_id == 'vPbXoPK4' and frame is not None:
         #     frame = correct_white_balance(frame)
 
@@ -953,16 +961,16 @@ def api_calibration_info(request):
     """API to get calibration info by assessment_id and test_id."""
     assessment_id = request.GET.get('assessment_id', '')
     test_id = request.GET.get('test_id', '')
-    
+
     try:
         calib = CalibrationDataModel.objects.filter(
             assessment_id=assessment_id,
             test_id=test_id
         ).first()
-        
+
         if not calib:
             return JsonResponse({'calibration': None})
-        
+
         data = {
             'id': calib.id,
             'assessment_id': calib.assessment_id,
@@ -976,9 +984,99 @@ def api_calibration_info(request):
             'origin_y': calib.origin_y,
             'frame_url': calib.frame.url if calib.frame else None,
         }
-        
+
         return JsonResponse({'calibration': data})
-    
+
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def pet_videos_page(request):
+    """Render page displaying all pet videos in table format."""
+    videos = PetVideos.objects.all().order_by('-uploaded_at')
+    processed_count = PetVideos.objects.filter(is_video_processed=True).count()
+    processing_count = PetVideos.objects.filter(is_video_processed=False).count()
+    return render(request, 'pet_videos.html', {
+        'videos': videos,
+        'processed_count': processed_count,
+        'processing_count': processing_count
+    })
+
+
+@csrf_exempt
+def queue_video_processing(request):
+    """Queue a video for processing."""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
+
+    video_id = request.POST.get('video_id')
+    if not video_id:
+        return JsonResponse({'status': 'error', 'message': 'No video ID provided'}, status=400)
+
+    try:
+        video = PetVideos.objects.get(id=video_id)
+        video.to_be_processed = True
+        video.progress = 0
+        video.is_video_processed = False
+        video.save()
+        video.run_processing()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Video queued for processing',
+            'video_id': video.id,
+            'progress': video.progress
+        })
+    except PetVideos.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Video not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Failed to queue video {video_id}: {str(e)}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': 'Failed to queue video'}, status=500)
+
+
+def unprocessed_videos_page(request):
+    """Render page listing unprocessed videos with id greater than UNPROCESSED_MIN_ID."""
+    videos = PetVideos.objects.filter(
+        id__gt=UNPROCESSED_MIN_ID,
+        is_video_processed=False,
+    ).order_by('id')
+    return render(request, 'unprocessed_videos.html', {
+        'videos': videos,
+        'unprocessed_count': videos.count(),
+        'min_id': UNPROCESSED_MIN_ID,
+    })
+
+
+@csrf_exempt
+def queue_all_unprocessed(request):
+    """Queue every unprocessed video with id greater than UNPROCESSED_MIN_ID for processing."""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
+
+    videos = PetVideos.objects.filter(
+        id__gt=UNPROCESSED_MIN_ID,
+        is_video_processed=False,
+    ).order_by('id')
+
+    queued_ids, failed_ids = [], []
+    for video in videos:
+        try:
+            video.to_be_processed = True
+            video.progress = 0
+            video.is_video_processed = False
+            video.save()
+            video.run_processing()
+            queued_ids.append(video.id)
+        except Exception as e:
+            logger.error(f"Failed to queue video {video.id}: {str(e)}", exc_info=True)
+            failed_ids.append(video.id)
+
+    return JsonResponse({
+        'status': 'success',
+        'message': f'Queued {len(queued_ids)} video(s) for processing.',
+        'queued_count': len(queued_ids),
+        'failed_count': len(failed_ids),
+        'queued_ids': queued_ids,
+        'failed_ids': failed_ids,
+    })
 

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unprocessed Videos - ImageMeasure</title>
+  <style>
+    :root {
+      --bg-1: #f8efe2;
+      --bg-2: #d7efe4;
+      --bg-3: #f6cfb8;
+      --ink: #1e2a2f;
+      --card: #ffffff;
+      --accent: #0f766e;
+      --accent-2: #0a5a54;
+      --shadow: rgba(15, 118, 110, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 15%, var(--bg-3), transparent 35%),
+        radial-gradient(circle at 80% 85%, #c6e5ff, transparent 30%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: color-mix(in srgb, var(--card) 90%, transparent);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 22px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(6px);
+      padding: 40px;
+      animation: fadeInUp 500ms ease-out both;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+      letter-spacing: 0.02em;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0 0 28px;
+      font-size: 0.95rem;
+      opacity: 0.75;
+    }
+
+    .back-btn {
+      display: inline-block;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(15, 118, 110, 0.1);
+      border: 1px solid var(--accent);
+      transition: all 180ms ease;
+    }
+
+    .back-btn:hover {
+      background: var(--accent);
+      color: white;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    .count-pill {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(15, 118, 110, 0.08);
+      border: 1px solid rgba(15, 118, 110, 0.2);
+      border-radius: 999px;
+      padding: 10px 18px;
+    }
+
+    .queue-all-btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: white;
+      background: linear-gradient(120deg, var(--accent), #14998f);
+      cursor: pointer;
+      transition: all 180ms ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 14px rgba(15, 118, 110, 0.3);
+    }
+
+    .queue-all-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(15, 118, 110, 0.4);
+    }
+
+    .queue-all-btn:active:not(:disabled) { transform: translateY(0); }
+
+    .queue-all-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .loading-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 600ms linear infinite;
+    }
+
+    .flash {
+      margin-bottom: 20px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      display: none;
+    }
+
+    .flash-success {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .flash-error {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    thead {
+      background: linear-gradient(120deg, var(--accent), #14998f);
+      color: white;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+    }
+
+    th {
+      padding: 16px 18px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(15, 118, 110, 0.08);
+    }
+
+    tbody tr { transition: background 150ms ease; }
+    tbody tr:hover { background: rgba(15, 118, 110, 0.06); }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 24px;
+      background: rgba(15, 118, 110, 0.1);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #14998f);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: white;
+      transition: width 300ms ease;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .status-processing {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      border: 1px solid var(--warning);
+    }
+
+    .test-type-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent);
+      border: 1px solid rgba(15, 118, 110, 0.2);
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--ink);
+      opacity: 0.6;
+    }
+
+    .empty-state h2 { margin: 0 0 12px; font-size: 1.5rem; }
+    .empty-state p { margin: 0; font-size: 1rem; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+      .container { padding: 20px; }
+      header { flex-direction: column; gap: 16px; text-align: center; }
+      h1 { font-size: 1.5rem; }
+      th, td { padding: 12px 10px; font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Unprocessed Videos</h1>
+      <a href="/" class="back-btn">← Back to Home</a>
+    </header>
+    <p class="subtitle">Videos with ID &gt; {{ min_id }} that have not been processed yet.</p>
+
+    <div id="flash" class="flash"></div>
+
+    <div class="toolbar">
+      <span class="count-pill">{{ unprocessed_count }} unprocessed video{{ unprocessed_count|pluralize }}</span>
+      <button id="queueAllBtn" class="queue-all-btn" onclick="queueAll(this)" {% if not videos %}disabled{% endif %}>
+        <span class="btn-text">⟳ Queue All for Processing</span>
+        <span class="loading-spinner" style="display: none;"></span>
+      </button>
+    </div>
+
+    {% if videos %}
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Participant</th>
+              <th>Test Name</th>
+              <th>Test Type</th>
+              <th>Progress</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for video in videos %}
+              <tr>
+                <td>{{ video.id }}</td>
+                <td>{{ video.participant_name }}</td>
+                <td>{{ video.test_id }}</td>
+                <td><span class="test-type-badge">{{ video.type_param|title }}</span></td>
+                <td>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar" style="width: {{ video.progress }}%;">
+                      {% if video.progress > 0 %}{{ video.progress }}%{% endif %}
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-badge status-processing">⟳ Unprocessed</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <h2>Nothing to Process</h2>
+        <p>There are no unprocessed videos with ID greater than {{ min_id }}.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <script>
+    function showFlash(message, isError) {
+      const flash = document.getElementById('flash');
+      flash.textContent = message;
+      flash.className = 'flash ' + (isError ? 'flash-error' : 'flash-success');
+      flash.style.display = 'block';
+    }
+
+    function queueAll(button) {
+      const count = {{ unprocessed_count }};
+      if (count === 0) return;
+      if (!confirm(`Queue all ${count} unprocessed video(s) for processing?`)) return;
+
+      const btnText = button.querySelector('.btn-text');
+      const spinner = button.querySelector('.loading-spinner');
+
+      button.disabled = true;
+      btnText.textContent = 'Queueing…';
+      spinner.style.display = 'block';
+
+      fetch('/api/queue_all_unprocessed/', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'success') {
+            let msg = data.message;
+            if (data.failed_count > 0) {
+              msg += ` ${data.failed_count} failed (IDs: ${data.failed_ids.join(', ')}).`;
+            }
+            showFlash(msg, data.failed_count > 0);
+            btnText.textContent = '✓ Queued';
+            spinner.style.display = 'none';
+            setTimeout(() => location.reload(), 2000);
+          } else {
+            showFlash('Error: ' + data.message, true);
+            button.disabled = false;
+            btnText.textContent = '⟳ Queue All for Processing';
+            spinner.style.display = 'none';
+          }
+        })
+        .catch(err => {
+          console.error('Queue all failed:', err);
+          showFlash('Failed to queue videos: ' + err, true);
+          button.disabled = false;
+          btnText.textContent = '⟳ Queue All for Processing';
+          spinner.style.display = 'none';
+        });
+    }
+
+    // Auto-refresh table + count every 5 seconds to reflect progress.
+    setInterval(() => {
+      fetch(window.location.pathname)
+        .then(response => response.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const newDoc = parser.parseFromString(html, 'text/html');
+
+          const newTable = newDoc.querySelector('.table-wrapper');
+          const oldTable = document.querySelector('.table-wrapper');
+          if (newTable && oldTable) {
+            oldTable.parentElement.replaceChild(newTable, oldTable);
+          }
+
+          const newPill = newDoc.querySelector('.count-pill');
+          const oldPill = document.querySelector('.count-pill');
+          if (newPill && oldPill) {
+            oldPill.textContent = newPill.textContent;
+          }
+        })
+        .catch(err => console.error('Auto-refresh failed:', err));
+    }, 5000);
+  </script>
+</body>
+</html>

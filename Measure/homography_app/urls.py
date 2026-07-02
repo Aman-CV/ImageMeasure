@@ -20,5 +20,13 @@ urlpatterns = [
     path('api/search_videos/', views.api_search_videos, name='api_search_videos'),
     path('api/video_detail/<int:video_id>/', views.api_video_detail, name='api_video_detail'),
     path('api/calibration_info/', views.api_calibration_info, name='api_calibration_info'),
+
+    # Pet videos list page
+    path('pet_videos/', views.pet_videos_page, name='pet_videos'),
+    path('api/queue_processing/', views.queue_video_processing, name='queue_processing'),
+
+    # Unprocessed videos (id > 1000) bulk-queue page
+    path('unprocessed_videos/', views.unprocessed_videos_page, name='unprocessed_videos'),
+    path('api/queue_all_unprocessed/', views.queue_all_unprocessed, name='queue_all_unprocessed'),
 ]
 
