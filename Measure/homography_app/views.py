@@ -32,6 +32,10 @@ logger = logging.getLogger(__name__)
 # Videos with an id above this threshold are eligible for the bulk "unprocessed" workflow.
 UNPROCESSED_MIN_ID = 1000
 
+# All calibration frames are resized to this (width, height). Plain simple
+# calibration only needs these dimensions, so it can skip the video decode.
+CALIB_FRAME_SIZE = (1280, 720)
+
 DEFAULT_HOMOGRAPH_POINTS = {
                 "p1": {"fx": None, "fy": None},
                 "p2": {"fx": None, "fy": None},
@@ -281,7 +285,7 @@ def _extract_middle_frame(video_file, test_id):
         if not ret or frame is None:
             raise ValueError('Could not extract frame from video')
         cv2.imwrite("media/calib_frame.jpg", frame)
-        return cv2.resize(frame, (1280, 720))
+        return cv2.resize(frame, CALIB_FRAME_SIZE)
     finally:
         if cap:
             cap.release()
@@ -306,7 +310,12 @@ def _save_preview_to_singleton(singleton, frame, file_name='frame.jpg'):
 
 def _run_simple_calibration(frame, payload):
     # singleton = SingletonHomographicMatrixModel.load()
-    h, w = frame.shape[:2]
+    # frame is None when use_homograph is false: nothing is drawn/saved and the
+    # dimensions are the fixed resize target, so we skip decoding the video.
+    if frame is not None:
+        h, w = frame.shape[:2]
+    else:
+        w, h = CALIB_FRAME_SIZE
 
     start_candidate = int(w * payload['position_factor2'])
     end_candidate = int(w * payload['position_factor'])
@@ -360,14 +369,14 @@ def _run_simple_calibration(frame, payload):
             cv2.rectangle(frame, (roi_x1, roi_y1), (roi_x2, roi_y2), (255, 255, 0), 1)
             cv2.circle(frame, (x, y), 6, (0, 255, 0), -1)
             cv2.putText(frame, key, (x + 8, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    else:
+    elif frame is not None:
         cv2.line(frame, (int(payload['origin_x'] * w), 0), (int(payload['origin_x'] * w), h), (0, 255, 0), 2)
 
     # _save_preview_to_singleton(singleton, frame, file_name='frame.jpg')
 
-    # Save frame to model
-    _, buffer = cv2.imencode('.jpg', frame)
-
+    # NOTE: the preview frame is intentionally not saved for now — the S3 upload
+    # added ~2.5s to every calibration and the frame is preview-only (no
+    # processing code reads it). Re-enable by passing 'frame' below if needed.
     _t_save = time.perf_counter()
     CalibrationDataModel.objects.update_or_create(
         test_id=payload['test_id'],
@@ -380,10 +389,9 @@ def _run_simple_calibration(frame, payload):
             'homography_points': homograph_points,
             'origin_x': int(payload['origin_x'] * w),
             'origin_y': int(payload['origin_y'] * h),
-            'frame': ContentFile(buffer.tobytes(), name='calibration_frame.jpg')
         }
     )
-    logger.info("calibration db+s3 save: %.3fs", time.perf_counter() - _t_save)
+    logger.info("calibration db save: %.3fs", time.perf_counter() - _t_save)
     return JsonResponse({'status': 'success', 'hpoints': homograph_points if homograph_points else {}})
 
 
@@ -463,9 +471,7 @@ def _run_homography_calibration(frame, payload):
         point['fx'] = float(order_points[i][0] / float(w))
         point['fy'] = float(order_points[i][1] / float(h))
 
-    # Save frame to model
-    _, buffer = cv2.imencode('.jpg', frame)
-    
+    # Preview frame not saved for now — see note in _run_simple_calibration.
     CalibrationDataModel.objects.update_or_create(
         test_id=payload['test_id'],
         assessment_id=payload['assessment_id'],
@@ -477,7 +483,6 @@ def _run_homography_calibration(frame, payload):
             'homography_points': homograph_points,
             'origin_x': int(payload['origin_x'] * w),
             'origin_y': int(payload['origin_y'] * h),
-            'frame': ContentFile(buffer.tobytes(), name='calibration_frame.jpg')
         }
     )
 
@@ -517,16 +522,23 @@ def upload_calibration_video(request):
     )
     payload['homograph_points'] = _parse_homograph_points(request.POST.get('hpoints', None))
 
-    _t0 = time.perf_counter()
-    try:
-        frame = _extract_middle_frame(payload['video_file'], payload['test_id'])
-    except ValueError as exc:
-        return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
-    _t_extract = time.perf_counter()
-
     #simple_test_ids = {'Vnb7E6L6', 'VpKl80KM', 'BwbJyXKl', 'G6bWk0bW', 'vPbXoPK4', 'lzb1PEKm'}
     simple_test_type = {"upper body strength", "lower body strength", "sprint speed", "speed", "agility", "flexibility", "endurance"}
-    if not payload['use_sam_homograph'] and payload['type_param'] in simple_test_type:
+    is_simple = not payload['use_sam_homograph'] and payload['type_param'] in simple_test_type
+
+    _t0 = time.perf_counter()
+    frame = None
+    # The frame is only needed for yellow-point detection (use_homograph) or the
+    # SAM/homography route. Plain simple calibration needs only the fixed frame
+    # dimensions, so we skip the video decode entirely.
+    if not (is_simple and not payload['use_homograph']):
+        try:
+            frame = _extract_middle_frame(payload['video_file'], payload['test_id'])
+        except ValueError as exc:
+            return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
+    _t_extract = time.perf_counter()
+
+    if is_simple:
         response = _run_simple_calibration(frame, payload)
     else:
         response = _run_homography_calibration(frame, payload)
