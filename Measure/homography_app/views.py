@@ -367,7 +367,8 @@ def _run_simple_calibration(frame, payload):
 
     # Save frame to model
     _, buffer = cv2.imencode('.jpg', frame)
-    
+
+    _t_save = time.perf_counter()
     CalibrationDataModel.objects.update_or_create(
         test_id=payload['test_id'],
         assessment_id=payload['assessment_id'],
@@ -382,6 +383,7 @@ def _run_simple_calibration(frame, payload):
             'frame': ContentFile(buffer.tobytes(), name='calibration_frame.jpg')
         }
     )
+    logger.info("calibration db+s3 save: %.3fs", time.perf_counter() - _t_save)
     return JsonResponse({'status': 'success', 'hpoints': homograph_points if homograph_points else {}})
 
 
@@ -515,17 +517,27 @@ def upload_calibration_video(request):
     )
     payload['homograph_points'] = _parse_homograph_points(request.POST.get('hpoints', None))
 
+    _t0 = time.perf_counter()
     try:
         frame = _extract_middle_frame(payload['video_file'], payload['test_id'])
     except ValueError as exc:
         return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
+    _t_extract = time.perf_counter()
 
     #simple_test_ids = {'Vnb7E6L6', 'VpKl80KM', 'BwbJyXKl', 'G6bWk0bW', 'vPbXoPK4', 'lzb1PEKm'}
     simple_test_type = {"upper body strength", "lower body strength", "sprint speed", "speed", "agility", "flexibility", "endurance"}
     if not payload['use_sam_homograph'] and payload['type_param'] in simple_test_type:
-        return _run_simple_calibration(frame, payload)
+        response = _run_simple_calibration(frame, payload)
+    else:
+        response = _run_homography_calibration(frame, payload)
 
-    return _run_homography_calibration(frame, payload)
+    _t_end = time.perf_counter()
+    logger.info(
+        "calibration timing: extract=%.3fs calibrate+save=%.3fs total=%.3fs (test=%s type=%s)",
+        _t_extract - _t0, _t_end - _t_extract, _t_end - _t0,
+        payload['test_id'], payload['type_param'],
+    )
+    return response
 
 # @csrf_exempt
 # def upload_calibration_video_deprecated(request):
